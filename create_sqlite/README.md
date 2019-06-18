@@ -1,0 +1,1 @@
+This folder contains the code to read the AEC's preference files and generate the SQLITE files for use by the explorer.  It is primitive, and does not take any command-line arguments: you have to set the state and year in the code itself.  Input files have to be named according to my conventions, not the AEC's.
