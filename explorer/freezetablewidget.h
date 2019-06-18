@@ -1,3 +1,6 @@
+// Following https://doc.qt.io/qt-5/qtwidgets-itemviews-frozencolumn-example.html, which
+// is released under the GNU Free Documentation license.
+
 #ifndef FREEZETABLEWIDGET_H
 #define FREEZETABLEWIDGET_H
 
