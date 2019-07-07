@@ -1,0 +1,1 @@
+IMPORTANT: this folder needs to be copied into a folder called 'boundaries' in the folder where the application lives.  The files are not included as a Qt resource in the executable, and need to be distributed with the executable for the maps to work.
