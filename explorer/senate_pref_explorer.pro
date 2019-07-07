@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui sql
+QT       += core gui sql quickwidgets qml network positioning
 
 RC_ICONS = pref6.ico
 
@@ -12,6 +12,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = senate_pref_explorer
 TEMPLATE = app
+
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which has been marked as deprecated (the exact warnings
@@ -30,7 +31,10 @@ SOURCES += \
         freezetablewidget.cpp \
         main.cpp \
         main_widget.cpp \
+        map_container.cpp \
+        polygon_model.cpp \
         table_window.cpp \
+        worker_setup_polygon.cpp \
         worker_sql_cross_table.cpp \
         worker_sql_main_table.cpp \
         worker_sql_npp_table.cpp
@@ -38,7 +42,10 @@ SOURCES += \
 HEADERS += \
         freezetablewidget.h \
         main_widget.h \
+        map_container.h \
+        polygon_model.h \
         table_window.h \
+        worker_setup_polygon.h \
         worker_sql_cross_table.h \
         worker_sql_main_table.h \
         worker_sql_npp_table.h
@@ -47,3 +54,9 @@ HEADERS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DISTFILES += \
+  map.qml
+
+RESOURCES += \
+  senate_pref_explorer.qrc

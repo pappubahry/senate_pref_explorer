@@ -10,7 +10,10 @@
 #include <QStandardItemModel>
 #include <QSqlDatabase>
 #include <QThread>
+#include <QQuickWidget>
 #include <table_window.h>
+#include "polygon_model.h"
+#include "map_container.h"
 
 struct Table_main_item
 {
@@ -92,7 +95,9 @@ private slots:
   void change_later_prefs_up_to(int i);
   void change_pref_sources_min(int i);
   void change_pref_sources_max(int i);
+  void update_map_scale_minmax();
   void calculate_n_party_preferred(bool by_booth = false);
+  void add_column_to_main_table(bool by_booth = false);
   void make_cross_table();
   void make_divisions_cross_table();
   void make_booths_cross_table();
@@ -107,6 +112,13 @@ private slots:
   void export_main_table();
   void copy_divisions_table();
   void export_divisions_table();
+  void reset_map_scale();
+  void zoom_to_state();
+  void zoom_to_capital();
+  void copy_map();
+  void export_map();
+  void delayed_copy_map();
+  void delayed_export_map(QString file_name);
   
 private:
   QPushButton *button_load;
@@ -127,6 +139,7 @@ private:
   QPushButton *button_n_party_preferred_calculate;
   ClickableLabel *label_sort;
   ClickableLabel *label_toggle_names;
+  QPushButton *button_calculate_after_spinbox;
   QWidget *container_copy_main_table;
   QPushButton *button_copy_main_table;
   QPushButton *button_export_main_table;
@@ -135,6 +148,7 @@ private:
   QPushButton *button_abbreviations;
   QPushButton *button_help;
   QLabel *label_division_table_title;
+  QLabel *label_map_title;
   QPushButton *button_divisions_copy;
   QPushButton *button_divisions_export;
   QPushButton *button_divisions_booths_export;
@@ -149,6 +163,14 @@ private:
   QVector<QVector<long>> cross_table_data;
   QVector<Table_main_item> temp_booths_table_data;
   QVector<QVector<Table_main_item>> temp_booths_npp_data;
+  Polygon_model map_divisions_model;
+  Map_container *qml_map_container;
+  QObject *qml_map;
+  QDoubleSpinBox *spinbox_map_min;
+  QDoubleSpinBox *spinbox_map_max;
+  ClickableLabel *label_reset_map_scale;
+  QPushButton *button_map_copy;
+  QPushButton *button_map_export;
   bool sort_ballot_order;
   Arbitrary_col_sort sort_npp;
   Arbitrary_col_sort sort_divisions;
@@ -165,6 +187,8 @@ private:
   int num_cands;
   int num_table_rows;
   QStringList divisions;
+  int year;
+  QString state_short;
   QString state_full;
   QStringList atl_groups;
   QStringList atl_groups_short;
@@ -182,22 +206,25 @@ private:
   bool booth_calculation;
   int one_line_height;
   int two_line_height;
+  double map_scale_min_default = 0.;
+  double map_scale_max_default = 100.;
   QString cross_table_title;
   QString divisions_cross_table_title;
   QVector<long> division_formal_votes;
   QVector<Booth> booths;
+  bool offset_set_map_center = false;
   void reset_spinboxes();
   void load_database(QString db_file);
   void set_table_groups();
   void setup_main_table();
   void reset_table();
-  void add_column_to_main_table(bool by_booth = false);
   void set_main_table_cells(int col, bool n_party_preferred = false);
   void set_all_main_table_cells();
   void set_main_table_row_height();
   void make_main_table_row_headers(bool is_blank);
   void do_sql_query_for_table(QString q, bool wide_table = false, bool by_booth = false);
   void set_divisions_table();
+  void set_divisions_map();
   void sort_table_column(int i);
   void sort_main_table();
   void sort_main_table_npp();
@@ -215,8 +242,9 @@ private:
   void write_sql_to_file(QString q);
   void copy_model(QStandardItemModel *model, QString title="");
   void export_model(QStandardItemModel *model, QString title="");
-  void update_output_path(QString file_name);
+  void update_output_path(QString file_name, QString file_type);
   void set_title_from_divisions_table();
+  void spinbox_change();
   QString get_export_divisions_table_title();
   QString get_export_line(QStandardItemModel *model, int i, QString separator);
   QStringList queries_threaded(QString q, int &num_threads, bool one_thread = false);
@@ -225,7 +253,7 @@ private:
   QString get_abtl();
   QString get_groups_table();
   QString get_short_group(int i);
-  QString get_output_path();
+  QString get_output_path(QString file_type);
   int get_width_from_text(QString t, QWidget *w, int buffer = 30);
   int get_num_groups();
   int get_n_preferred();
@@ -244,6 +272,7 @@ private:
   void highlight_cell(int i, int j);
   void highlight_cell_n_party_preferred(int i, int j);
   void unhighlight_cell(int i, int j);
+  QPixmap get_pixmap_for_map();
 };
 
 #endif // MAIN_WIDGET_H

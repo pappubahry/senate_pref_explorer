@@ -20,6 +20,7 @@
 // Constructor for standard cross table (double)
 Table_window::Table_window(QVector<double> base,
                            QStringList groups,
+                           QVector<int> ignore_groups,
                            QVector<QVector<double>> table_data,
                            QString title,
                            QWidget *parent)
@@ -29,6 +30,7 @@ Table_window::Table_window(QVector<double> base,
   _standard_cross_table = true;
   
   _title = title;
+  copy_ignore_groups(ignore_groups);
   
   QString regular_width = groups.at(0).contains("_") ? "AAAA_99" : "999.99";
   
@@ -40,6 +42,7 @@ Table_window::Table_window(QVector<double> base,
 // Constructor for standard cross table (long)
 Table_window::Table_window(QVector<long> base,
                            QStringList groups,
+                           QVector<int> ignore_groups, 
                            QVector<QVector<long>> table_data,
                            QString title,
                            QWidget *parent)
@@ -49,6 +52,7 @@ Table_window::Table_window(QVector<long> base,
   _standard_cross_table = true;
   
   _title = title;
+  copy_ignore_groups(ignore_groups);
   
   QString regular_width = get_max_width_string(table_data);
   
@@ -156,6 +160,14 @@ Table_window::Table_window(QStringList short_names, QStringList full_names, QWid
   
   _model->horizontalHeaderItem(0)->setTextAlignment(Qt::AlignLeft);
   _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignLeft);
+}
+
+void Table_window::copy_ignore_groups(QVector<int> ignore_groups)
+{
+  for (int i = 0; i < ignore_groups.length(); i++)
+  {
+    _ignore_groups.append(ignore_groups.at(i));
+  }
 }
 
 void Table_window::setup_table_data_long(QVector<long> &base,
@@ -473,6 +485,7 @@ void Table_window::set_table_cells()
       }
       else
       {
+        // Divisions cross table
         if (i == 0)
         {
           _model->horizontalHeaderItem(1)->setText("Division");
@@ -506,8 +519,10 @@ void Table_window::set_table_cells()
           _model->horizontalHeaderItem(j+2)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         }
         
-        if (_standard_cross_table && ((idx_i == idx_j)          ||
-                                      (_base.at(idx_i) < 1.e-10)))
+        if (_standard_cross_table && ((idx_i == idx_j)                     ||
+                                      (_base.at(idx_i) < 1.e-10)           ||
+                                      (_ignore_groups.indexOf(idx_i) >= 0) ||
+                                      (_ignore_groups.indexOf(idx_j) >= 0)))
         {
           _model->item(i, j+2)->setText("");
         }

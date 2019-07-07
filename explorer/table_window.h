@@ -13,8 +13,8 @@ class Table_window : public QWidget
   Q_OBJECT
 public:
   // Constructors for standard cross tables:
-  Table_window(QVector<double> base, QStringList groups, QVector<QVector<double>> table_data, QString title, QWidget *parent);
-  Table_window(QVector<long> base, QStringList groups, QVector<QVector<long>> table_data, QString title, QWidget *parent);
+  Table_window(QVector<double> base, QStringList groups, QVector<int> ignore_groups, QVector<QVector<double>> table_data, QString title, QWidget *parent);
+  Table_window(QVector<long> base, QStringList groups, QVector<int> ignore_groups, QVector<QVector<long>> table_data, QString title, QWidget *parent);
   
   // Constructors for divisions cross tables:
   Table_window(QVector<double> base, QStringList divisions, QStringList groups, QVector<QVector<double>> table_data, QString title, QWidget *parent);
@@ -39,6 +39,7 @@ private:
   FreezeTableWidget *table;
   QStandardItemModel *_model;
   QVector<double> _base;
+  QVector<int> _ignore_groups;
   QStringList _groups;
   QStringList _divisions;
   QStringList _short_names;
@@ -56,6 +57,7 @@ private:
   int _sort_col;
   QVector<int> _sort_indices_rows;
   QVector<int> _sort_indices_cols;
+  void copy_ignore_groups(QVector<int> ignore_groups);
   void setup_table_data_long(QVector<long> &base, QVector<QVector<long>> &t, QStringList &groups);
   void setup_table_data_double(QVector<double> &base, QVector<QVector<double>> &t, QStringList &groups);
   QString get_max_width_string(QVector<QVector<long>> &t);
