@@ -12,10 +12,9 @@ public:
                         QString db_file,
                         QString q,
                         bool wide_table,
-                        bool base_count,
                         int num_groups,
                         int num_rows,
-                        int num_divisions,
+                        int num_geo_groups,
                         QVector<int> clicked_cells);
   ~Worker_sql_main_table();
   
@@ -23,7 +22,7 @@ public slots:
   void do_query();
   
 signals:
-  void finished_query(const QVector<Table_main_item> &partial_table);
+  void finished_query(const QVector<QVector<long>> &partial_table);
   void progress(double d); // *** Maybe useless ***
   void error(QString err);
   
@@ -32,10 +31,9 @@ private:
   QString _db_file;
   QString _q;
   bool _wide_table;
-  bool _base_count;
   int _num_groups;
   int _num_rows;
-  int _num_divisions;
+  int _num_geo_groups;
   QVector<int> _clicked_cells;
 };
 

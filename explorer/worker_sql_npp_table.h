@@ -12,7 +12,7 @@ public:
                        QString db_file,
                        QString q,
                        int num_groups,
-                       int num_divisions,
+                       int num_geo_groups,
                        QVector<int> clicked_n_parties);
   ~Worker_sql_npp_table();
   
@@ -20,7 +20,7 @@ public slots:
   void do_query();
   
 signals:
-  void finished_query(const QVector<QVector<Table_main_item>> &partial_table);
+  void finished_query(const QVector<QVector<QVector<long>>> &partial_table);
   void progress(double d); // *** Prob useless ***
   void error (QString err);
   
@@ -30,7 +30,7 @@ private:
   QString _q;
   int _num_groups;
   QVector<int> _clicked_n_parties;
-  int _num_divisions;
+  int _num_geo_groups;
 };
 
 #endif // WORKER_SQL_NPP_TABLE_H

@@ -12,15 +12,22 @@ public:
   ~Map_container();
   void init_variables();
   void update_coords();
+  int get_size();
+  
+public slots:
+  void show_tooltip(QString text);
   
 signals:
   void mouse_moved(double lon, double lat);
+  void mouse_moved(double lon, double lat, double d_lon, double d_lat);
+  void double_clicked();
   
 protected:
   void mouseMoveEvent(QMouseEvent *event);
   void mousePressEvent(QMouseEvent *event);
   void mouseReleaseEvent(QMouseEvent *event);
   void wheelEvent(QWheelEvent *event);
+  void mouseDoubleClickEvent(QMouseEvent *event);
   
 private:
   const double rad2deg = 57.2957795131;

@@ -28,23 +28,27 @@ DEFINES += QT_DEPRECATED_WARNINGS
 CONFIG += c++11
 
 SOURCES += \
+        booth_model.cpp \
         freezetablewidget.cpp \
         main.cpp \
         main_widget.cpp \
         map_container.cpp \
         polygon_model.cpp \
         table_window.cpp \
+        worker_setup_booth.cpp \
         worker_setup_polygon.cpp \
         worker_sql_cross_table.cpp \
         worker_sql_main_table.cpp \
         worker_sql_npp_table.cpp
 
 HEADERS += \
+        booth_model.h \
         freezetablewidget.h \
         main_widget.h \
         map_container.h \
         polygon_model.h \
         table_window.h \
+        worker_setup_booth.h \
         worker_setup_polygon.h \
         worker_sql_cross_table.h \
         worker_sql_main_table.h \

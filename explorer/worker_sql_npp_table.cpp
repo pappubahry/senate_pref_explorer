@@ -4,20 +4,19 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
-#include <QDebug>
 
 Worker_sql_npp_table::Worker_sql_npp_table(int thread_num,
                                            QString db_file,
                                            QString q,
                                            int num_groups,
-                                           int num_divisions,
+                                           int num_geo_groups,
                                            QVector<int> clicked_n_parties)
 {
   _thread_num = thread_num;
   _db_file = db_file;
   _q = q;
   _num_groups = num_groups;
-  _num_divisions = num_divisions;
+  _num_geo_groups = num_geo_groups;
   _clicked_n_parties = QVector<int>();
   
   for (int i = 0; i < clicked_n_parties.length(); i++)
@@ -54,25 +53,23 @@ void Worker_sql_npp_table::do_query()
     
     int n = _clicked_n_parties.length();
     
-    QVector<QVector<Table_main_item>> table_results;
+    QVector<QVector<QVector<long>>> table_results;
     
     for (int i = 0; i <= n; i++)
     {
-      table_results.append(QVector<Table_main_item>(_num_groups));
+      table_results.append(QVector<QVector<long>>());
       for (int j = 0; j < _num_groups; j++)
       {
-        table_results[i][j].group_id = i;
-        table_results[i][j].sorted_idx = i;
-        for (int k = 0; k < _num_divisions; k++)
+        table_results[i].append(QVector<long>());
+        for (int k = 0; k < _num_geo_groups; k++)
         {
-          table_results[i][j].votes.append(0);
+          table_results[i][j].append(0);
         }
       }
     }
     
-    
     int div_id, group_id, n_party_id;
-    long div_votes;
+    long votes;
     
     while (query.next())
     {
@@ -95,14 +92,14 @@ void Worker_sql_npp_table::do_query()
         return;
       }
       
-      div_votes = query.value(2).toLongLong();
+      votes = query.value(2).toLongLong();
       
       if (_clicked_n_parties.indexOf(group_id) > -1)
       {
-        div_votes = 0;
+        votes = 0;
       }
       
-      table_results[n_party_id][group_id].votes.replace(div_id, div_votes);
+      table_results[n_party_id][group_id][div_id] = votes;
     }
     
     _db.close();

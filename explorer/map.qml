@@ -4,6 +4,7 @@ import QtLocation 5.11
 import QtPositioning 5.11
 import QtQml 2.12
 import Division_boundaries 1.0
+import Booths 1.0
 
 
 Item
@@ -30,15 +31,41 @@ Item
     center: QtPositioning.coordinate(latitude, longitude)
     zoomLevel: zoom_level
     
+    
     MapItemView
     {
-      model: divisions_model
+      model: divisions_model;
       
       delegate: MapPolygon
       {
-        path: model.coordinates
-        color: Qt.rgba(model.red, model.green, model.blue, 1.0)
-        opacity: model.opacity
+        path: model.coordinates;
+        border.color: "black";
+        border.width: 2;
+        color: Qt.rgba(model.red, model.green, model.blue, model.opacity);
+      }
+    }
+    
+    
+    MapItemView
+    {
+      model: booths_model
+      
+      delegate: MapQuickItem
+      {
+        coordinate: model.coordinates;
+        anchorPoint.x: booth_txt.width/2;
+        anchorPoint.y: booth_txt.height/2;
+        
+        sourceItem: Text
+        {
+          id: booth_txt;
+          text: model.text;
+          visible: model.text_visible;
+          font.pointSize: 14;
+          style: Text.Outline;
+          styleColor: "black";
+          color: Qt.rgba(model.red, model.green, model.blue, 1.);
+        }
       }
     }
     

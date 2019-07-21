@@ -4,26 +4,23 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
-#include <QDebug>
 
 Worker_sql_main_table::Worker_sql_main_table(int thread_num,
                                              QString db_file,
                                              QString q,
                                              bool wide_table,
-                                             bool base_count,
                                              int num_groups,
                                              int num_rows,
-                                             int num_divisions,
+                                             int num_geo_groups,
                                              QVector<int> clicked_cells)
 {
   _thread_num = thread_num;
   _db_file = db_file;
   _q = q;
   _wide_table = wide_table;
-  _base_count = base_count;
   _num_groups = num_groups;
   _num_rows = num_rows;
-  _num_divisions = num_divisions;
+  _num_geo_groups = num_geo_groups;
   _clicked_cells = QVector<int>();
   for (int i = 0; i < clicked_cells.length(); i++)
   {
@@ -62,20 +59,13 @@ void Worker_sql_main_table::do_query()
       return;
     }
     
-    // This hack is for booth exports -- I don't have
-    // a previous base count to work from in the main table,
-    // so I need to calculate it during the query (sometimes).
-    int extra_row = _wide_table && _base_count ? 1 : 0;
+    QVector<QVector<long>> column_results(_num_rows);
     
-    QVector<Table_main_item> column_results(_num_rows + extra_row);
-    
-    for (int i = 0; i < _num_rows + extra_row; i++)
+    for (int i = 0; i < _num_rows; i++)
     {
-      column_results[i].group_id = i;
-      column_results[i].sorted_idx = i;
-      for (int j = 0; j < _num_divisions; j++)
+      for (int j = 0; j < _num_geo_groups; j++)
       {
-        column_results[i].votes.append(0);
+        column_results[i].append(0);
       }
     }
     
@@ -96,15 +86,14 @@ void Worker_sql_main_table::do_query()
         }
         
         div_id = query.value(0).toInt();
-        for (int i = 1; i < _num_groups + 2 + extra_row; i++)
+        for (int i = 1; i < _num_groups + 2; i++)
         {
           group_id = i - 1;
           
           // If the group has already been clicked on in the table, then set the
           // cell to zero.
           div_votes = _clicked_cells.indexOf(group_id) >= 0 ? 0 : query.value(i).toLongLong();
-          
-          column_results[group_id].votes.replace(div_id, div_votes);
+          column_results[group_id][div_id] = div_votes;
         }
       }
     }
@@ -118,8 +107,7 @@ void Worker_sql_main_table::do_query()
         if (group_id == 999) { group_id = _num_groups; }  // Exhaust
         
         div_votes = query.value(2).toLongLong();
-        
-        column_results[group_id].votes.replace(div_id, div_votes);
+        column_results[group_id][div_id] = div_votes;
       }
     }
     

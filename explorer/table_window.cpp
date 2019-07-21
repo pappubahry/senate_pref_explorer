@@ -11,7 +11,6 @@
 #include <QTableView>
 #include <QStandardItemModel>
 #include <QHeaderView>
-#include <QDebug>
 #include <QScrollBar>
 #include <QSpacerItem>
 #include <freezetablewidget.h>

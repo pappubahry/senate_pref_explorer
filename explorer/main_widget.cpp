@@ -14,6 +14,7 @@ CREATE TABLE btl (id INTEGER PRIMARY KEY, seat_id INTEGER, booth_id INTEGER, num
 #include "worker_sql_npp_table.h"
 #include "worker_sql_cross_table.h"
 #include "table_window.h"
+#include "math.h"
 
 // Layout etc.:
 #include <QSplitter>
@@ -57,10 +58,9 @@ CREATE TABLE btl (id INTEGER PRIMARY KEY, seat_id INTEGER, booth_id INTEGER, num
 #include <QQuickWidget>
 #include <QQuickItem>
 #include <QTimer>
-//#include <QSslSocket>
-//#include <QGeoPath>
-#include "polygon_model.h"
 #include "map_container.h"
+#include "polygon_model.h"
+#include "booth_model.h"
 
 #include <QMessageBox>
 
@@ -81,12 +81,12 @@ Widget::Widget(QWidget *parent)
   // This is needed to allow a column of table data to be an argument to 
   // a signal (which is emitted when a thread finishes processing an SQL
   // query):
-  qRegisterMetaType<QVector<Table_main_item>>("QVector<Table_main_item>");
-  qRegisterMetaType<QVector<QVector<Table_main_item>>>("QVector<QVector<Table_main_item>>");
+  qRegisterMetaType<QVector<QVector<QVector<long>>>>("QVector<QVector<QVector<long>>>");
   qRegisterMetaType<QVector<QVector<long>>>("QVector<QVector<long>>");
   
   // Required to allow the QML to talk to the model containing the polygons:
   qmlRegisterType<Polygon_model>("Division_boundaries", 1, 0, "Polygon_model");
+  qmlRegisterType<Booth_model>("Booths", 1, 0, "Booth_model");
   
   
   // The key to having the interface resize nicely when the user resizes the window is:
@@ -469,8 +469,10 @@ Widget::Widget(QWidget *parent)
   
   // ~~~~~ Right-hand column: map ~~~~~
   int map_size = 512;
+  int booth_threshold = 100;
   
   map_divisions_model.setup_list("", 2016, QStringList{});
+  map_booths_model.setup_list(booths, booth_threshold);
   
   QVBoxLayout *layout_right = new QVBoxLayout();
   
@@ -478,9 +480,12 @@ Widget::Widget(QWidget *parent)
   label_map_title->setMaximumWidth(map_size);
   label_map_title->setWordWrap(true);
   
-  qml_map_container = new Map_container(map_size);
+  qml_map_container = new Map_container(map_size, this);
   qml_map_container->setMaximumWidth(map_size);
+  qml_map_container->setStyleSheet("QToolTip { color: #000000; }");
+  
   qml_map_container->rootContext()->setContextProperty("divisions_model", &map_divisions_model);
+  qml_map_container->rootContext()->setContextProperty("booths_model", &map_booths_model);
   qml_map_container->rootContext()->setContextProperty("map_size", map_size);
   
   qml_map_container->setSource(QUrl("qrc:///map.qml"));
@@ -548,28 +553,69 @@ Widget::Widget(QWidget *parent)
   label_zoom_to_capital->setCursor(Qt::PointingHandCursor);
   label_zoom_to_capital->setSizePolicy(QSizePolicy());
   
+  ClickableLabel *label_zoom_to_division = new ClickableLabel();
+  label_zoom_to_division->setText("<i>Division</i>  ");
+  label_zoom_to_division->setCursor(Qt::PointingHandCursor);
+  label_zoom_to_division->setSizePolicy(QSizePolicy());
+  
+  button_map_copy = new QPushButton("Copy");
+  button_map_export = new QPushButton("Export...");
+  
   layout_map_zooms->addWidget(label_zoom_to);
   layout_map_zooms->addWidget(label_zoom_to_state);
   layout_map_zooms->addWidget(label_zoom_to_capital);
+  layout_map_zooms->addWidget(label_zoom_to_division);
+  layout_map_zooms->addWidget(button_map_copy);
+  layout_map_zooms->addWidget(button_map_export);
   layout_map_zooms->addItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum));
   
+  QHBoxLayout *layout_map_options = new QHBoxLayout();
   
-  QHBoxLayout *layout_map_copy_export = new QHBoxLayout();
-  button_map_copy = new QPushButton("Copy");
-  button_map_export = new QPushButton("Export...");
-  QSpacerItem *spacer_map_copy_export = new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum);
+  combo_map_type = new QComboBox;
+  combo_map_type->addItem("Divisions", "divisions");
+  combo_map_type->addItem("Election day booths", "booths_election_day");
+  combo_map_type->addItem("Prepoll booths", "booths_prepoll");
   
-  layout_map_copy_export->addWidget(button_map_copy);
-  layout_map_copy_export->addWidget(button_map_export);
-  layout_map_copy_export->addItem(spacer_map_copy_export);
+  //combo_map_booth_type = new QComboBox;
+  //combo_map_booth_type->addItem("Squares", "square");
+  //combo_map_booth_type->addItem("Numbers", "text");  
+  
+  label_map_booth_min_1 = new QLabel("with at least");
+  label_map_booth_min_2 = new QLabel("votes");
+  
+  spinbox_map_booth_threshold = new QSpinBox;
+  spinbox_map_booth_threshold->setMinimum(0);
+  spinbox_map_booth_threshold->setMaximum(10000);
+  spinbox_map_booth_threshold->setValue(booth_threshold);
+  spinbox_map_booth_threshold->setSingleStep(50);
+  spinbox_map_booth_threshold->setAlignment(Qt::AlignRight);
+  spinbox_map_booth_threshold->setKeyboardTracking(false);
+  spinbox_map_booth_threshold->setMinimumWidth(legend_spinbox_width);
+  spinbox_map_booth_threshold->setMaximumWidth(legend_spinbox_width);
+  
+  QSizePolicy sp_retain = spinbox_map_booth_threshold->sizePolicy();
+  sp_retain.setRetainSizeWhenHidden(true);
+  spinbox_map_booth_threshold->setSizePolicy(sp_retain);
+  
+  QSpacerItem *spacer_map_options = new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Minimum);
+  
+  label_map_booth_min_1->hide();
+  label_map_booth_min_2->hide();
+  spinbox_map_booth_threshold->hide();
+  
+  layout_map_options->addWidget(combo_map_type);
+  //layout_map_options->addWidget(combo_map_booth_type);
+  layout_map_options->addWidget(label_map_booth_min_1);
+  layout_map_options->addWidget(spinbox_map_booth_threshold);
+  layout_map_options->addWidget(label_map_booth_min_2);
+  layout_map_options->addItem(spacer_map_options);
   
   layout_right->addWidget(label_map_title);
   layout_right->addWidget(label_map_division_info);
   layout_right->addWidget(qml_map_container);
   layout_right->addLayout(layout_map_legend);
+  layout_right->addLayout(layout_map_options);
   layout_right->addLayout(layout_map_zooms);
-  layout_right->addLayout(layout_map_copy_export);
-  
   layout_right->insertStretch(-1, 1);
   
   
@@ -633,15 +679,30 @@ Widget::Widget(QWidget *parent)
   connect(label_reset_map_scale,              SIGNAL(clicked()),                    this, SLOT(reset_map_scale()));
   connect(label_zoom_to_state,                SIGNAL(clicked()),                    this, SLOT(zoom_to_state()));
   connect(label_zoom_to_capital,              SIGNAL(clicked()),                    this, SLOT(zoom_to_capital()));
+  connect(label_zoom_to_division,             SIGNAL(clicked()),                    this, SLOT(zoom_to_division()));
   connect(button_map_copy,                    SIGNAL(clicked()),                    this, SLOT(copy_map()));
   connect(button_map_export,                  SIGNAL(clicked()),                    this, SLOT(export_map()));
   connect(spinbox_map_min,                    SIGNAL(valueChanged(double)),         this, SLOT(update_map_scale_minmax()));
   connect(spinbox_map_max,                    SIGNAL(valueChanged(double)),         this, SLOT(update_map_scale_minmax()));
+  connect(combo_map_type,                     SIGNAL(currentIndexChanged(int)),     this, SLOT(change_map_type()));
+  //connect(combo_map_booth_type,               SIGNAL(currentIndexChanged(int)),     this, SLOT(change_map_booth_type()));
+  connect(spinbox_map_booth_threshold,        SIGNAL(valueChanged(int)),            this, SLOT(change_map_booth_threshold(int)));
   
   connect(qml_map_container, SIGNAL(mouse_moved(double, double)), &map_divisions_model, SLOT(point_in_polygon(double, double)));
+  connect(qml_map_container, SIGNAL(mouse_moved(double, double, double, double)), &map_booths_model, SLOT(check_mouseover(double, double, double, double)));
+  
+  // Daisy-chained pair of connections for double-click to zoom to division:
+  connect(qml_map_container,    SIGNAL(double_clicked()),             &map_divisions_model, SLOT(received_double_click()));
+  connect(&map_divisions_model, SIGNAL(double_clicked_division(int)), this,                 SLOT(zoom_to_division(int)));
+  
+  connect(&map_booths_model, SIGNAL(send_tooltip(QString)), qml_map_container, SLOT(show_tooltip(QString)));
+  
   connect(qml_root_object,   SIGNAL(exited_map()),                &map_divisions_model, SLOT(exited_map()));
   connect(spinbox_map_min,   SIGNAL(valueChanged(double)),        &map_divisions_model, SLOT(update_scale_min(double)));
   connect(spinbox_map_max,   SIGNAL(valueChanged(double)),        &map_divisions_model, SLOT(update_scale_max(double)));
+  
+  connect(spinbox_map_min,   SIGNAL(valueChanged(double)),        &map_booths_model, SLOT(update_scale_min(double)));
+  connect(spinbox_map_max,   SIGNAL(valueChanged(double)),        &map_booths_model, SLOT(update_scale_max(double)));
 }
 
 Widget::~Widget()
@@ -745,6 +806,7 @@ void Widget::load_database(QString db_file)
 {
   // Get rid of any data that might exist:
   table_main_data.clear();
+  table_main_booth_data.clear();
   table_main_model->clear();
   clicked_cells.clear();
   clicked_cells_n_party.clear();
@@ -909,6 +971,17 @@ void Widget::load_database(QString db_file)
         combo_division->clear();
         
         divisions.clear();
+        division_bboxes.clear();
+        
+        // The bounding box for each division will be set based
+        // on its election-day booths; initialise the bounds so
+        // that they'll be updated from the first read of a booth
+        // coordinate:
+        Bounding_box bbox;
+        bbox.min_latitude = 0.;
+        bbox.max_latitude = -80;
+        bbox.min_longitude = 180.;
+        bbox.max_longitude = 0.;
         
         while(query.next())
         {
@@ -916,6 +989,7 @@ void Widget::load_database(QString db_file)
           divisions.append(div);
           combo_division->addItem(div);
           division_formal_votes.append(query.value(1).toLongLong());
+          division_bboxes.append(bbox);
         }
         combo_division->addItem(state_full);
         combo_division->setCurrentIndex(divisions.length());
@@ -935,12 +1009,18 @@ void Widget::load_database(QString db_file)
       else
       {
         booths.clear();
+        
         int i = 0;
+        
         while (query.next())
         {
           Booth this_booth;
           this_booth.id = query.value(0).toInt();
           this_booth.division = query.value(1).toString();
+          
+          // I was worried that 3000 indexOf's would be slow, but it's fine:
+          this_booth.division_id = divisions.indexOf(this_booth.division);
+          
           this_booth.booth = query.value(2).toString();
           this_booth.longitude = query.value(3).toDouble();
           this_booth.latitude = query.value(4).toDouble();
@@ -951,6 +1031,34 @@ void Widget::load_database(QString db_file)
             errors = true;
             error_msg = "Booth ID's not as expected";
             break;
+          }
+          
+          if (this_booth.division_id < 0)
+          {
+            errors = true;
+            error_msg = QString("Error reading booths; couldn't find %1 in %2")
+                .arg(this_booth.booth).arg(this_booth.division);
+            break;
+          }
+          
+          // Update bounding box based on election-day booths with non-zero lon/lat:
+          if (!this_booth.booth.contains("PPVC")                         &&
+              !this_booth.booth.contains("PREPOLL", Qt::CaseInsensitive) &&
+              !this_booth.booth.contains("Sydney (")                     &&
+              !this_booth.booth.contains("Adelaide (")                   &&
+              !this_booth.booth.contains("Perth (")                      &&
+              !this_booth.booth.contains("Brisbane City (")               &&
+              !this_booth.booth.contains("Hobart (")                     &&
+              !this_booth.booth.contains("Melbourne ("))
+          {
+            if (this_booth.latitude < -1. && this_booth.longitude > 1. && this_booth.formal_votes > 0)
+            {
+              int j = this_booth.division_id;
+              division_bboxes[j].max_latitude = qMax(division_bboxes[j].max_latitude, this_booth.latitude);
+              division_bboxes[j].min_latitude = qMin(division_bboxes[j].min_latitude, this_booth.latitude);
+              division_bboxes[j].max_longitude = qMax(division_bboxes[j].max_longitude, this_booth.longitude);
+              division_bboxes[j].min_longitude = qMin(division_bboxes[j].min_longitude, this_booth.longitude);
+            }
           }
           
           i++;
@@ -999,6 +1107,7 @@ void Widget::load_database(QString db_file)
     spinbox_pref_sources_max->setMinimum(get_pref_sources_min());
     
     map_divisions_model.setup_list(state_short, year, divisions);
+    map_booths_model.setup_list(booths, get_map_booth_threshold());
     
     setup_main_table();
     
@@ -1033,6 +1142,7 @@ void Widget::set_table_groups()
 void Widget::setup_main_table()
 {
   table_main_data.clear();
+  table_main_booth_data.clear();
   
   int current_num_groups = get_num_groups();
   num_table_rows = current_num_groups + 1;
@@ -1151,234 +1261,75 @@ void Widget::make_main_table_row_headers(bool is_blank)
   }
 }
 
-void Widget::process_thread_sql_main_table(const QVector<Table_main_item> &col_data)
+void Widget::process_thread_sql_main_table(const QVector<QVector<long>> &col_data)
 {
-  if (booth_calculation)
+  int col = table_main_data.length() - 1;
+  
+  for (int i = 0; i < num_table_rows; i++)
   {
-    // Rows and columns will be transposed at output; for now, they are
-    // treated as though this is a column of the main table.
-    int num_rows = col_data.length();
-    int num_cols = col_data.at(0).votes.length();
-    
-    if (temp_booths_table_data.length() == 0)
+    for (int j = 0; j < col_data.at(i).length(); j++)
     {
-      temp_booths_table_data = QVector<Table_main_item>();
-      
-      for (int i = 0; i < num_rows; i++)
-      {
-        temp_booths_table_data.append(Table_main_item());
-        temp_booths_table_data[i].group_id = i;
-        temp_booths_table_data[i].sorted_idx = i;
-        temp_booths_table_data[i].votes = QVector<long>();
-        
-        for (int j = 0; j < num_cols; j++)
-        {
-          temp_booths_table_data[i].votes.append(0);
-        }
-      }
-    }
-    
-    for (int i = 0; i < num_rows; i++)
-    {
-      for (int j = 0; j < num_cols; j++)
-      {
-        temp_booths_table_data[i].votes[j] += col_data.at(i).votes.at(j);
-      }
-    }
-    
-    completed_threads++;
-    
-    if (completed_threads == current_threads)
-    {
-      QFile out_file(booths_output_file);
-      
-      int num_booths = booths.length();
-      if (num_booths != temp_booths_table_data.at(0).votes.length())
-      {
-        QMessageBox msgBox;
-        msgBox.setText("Internal error: wrong number of booths in output.");
-        msgBox.exec();
-        unlock_main_interface();
-        return;
-      }
-      
-      int num_input_cols = temp_booths_table_data.length();
-      if (num_input_cols != table_main_groups_short.length() + 1 &&
-          num_input_cols != table_main_groups_short.length() + 2)
-      {
-        QMessageBox msgBox;
-        msgBox.setText("Internal error: wrong number of groups in output.");
-        msgBox.exec();
-        unlock_main_interface();
-        return;
-      }
-      
-      bool sum_base = (num_input_cols == table_main_groups_short.length() + 1);
-      int num_output_cols = table_main_groups_short.length() + 1;
-      
-      if (out_file.open(QIODevice::WriteOnly))
-      {
-        QTextStream out(&out_file);
-        
-        QString value_type = get_value_type();
-        QString table_type = get_table_type();
-        
-        set_title_from_divisions_table();
-        QString title_line = QString("\"%1\"").arg(divisions_cross_table_title);
-        
-        out << title_line << endl;
-        
-        QString header("Division,Booth,Longitude,Latitude,Total,Base");
-        
-        for (int i = 0; i < table_main_groups_short.length(); i++)
-        {
-          header = QString("%1,%2").arg(header).arg(get_short_group(i));
-        }
-        header = QString("%1,Exh").arg(header);
-        
-        out << header << endl;
-        
-        for (int i = 0; i < num_booths; i++)
-        {
-          QString line = QString("%1,\"%2\",%3,%4,%5")
-              .arg(booths.at(i).division).arg(booths.at(i).booth)
-              .arg(booths.at(i).longitude).arg(booths.at(i).latitude)
-              .arg(booths.at(i).formal_votes);
-          
-          long base = 0;
-          
-          if (clicked_cells.length() == 1)
-          {
-            base = booths.at(i).formal_votes;
-          }
-          else
-          {
-            if (sum_base)
-            {
-              for (int j = 0; j < num_output_cols; j++)
-              {
-                base += temp_booths_table_data.at(j).votes.at(i);
-              }
-            }
-            else
-            {
-              base = temp_booths_table_data.at(num_output_cols).votes.at(i);
-            }
-          }
-          
-          if (value_type == "votes")
-          {
-            line = QString("%1,%2").arg(line).arg(base);
-          }
-          else
-          {
-            double val = booths.at(i).formal_votes == 0 ? 0. : 100. * base / booths.at(i).formal_votes;
-            line = QString("%1,%2").arg(line).arg(val, 0, 'f', 2);
-          }
-          
-          for (int j = 0; j < num_output_cols; j++)
-          {
-            if (value_type == "votes")
-            {
-              line = QString("%1,%2").arg(line).arg(temp_booths_table_data.at(j).votes.at(i));
-            }
-            else if (value_type == "percentages")
-            {
-              double val = base == 0 ? 0. : 100. * temp_booths_table_data.at(j).votes.at(i) / base;
-              line = QString("%1,%2").arg(line).arg(val, 0, 'f', 2);
-            }
-            else if (value_type == "total_percentages")
-            {
-              double val = booths.at(i).formal_votes == 0 ? 0. : 100. * temp_booths_table_data.at(j).votes.at(i) / booths.at(i).formal_votes;
-              line = QString("%1,%2").arg(line).arg(val, 0, 'f', 2);
-            }
-          }
-          
-          out << line << endl;
-        }
-        
-        out_file.close();
-      }
-      else
-      {
-        QMessageBox msgBox;
-        msgBox.setText("Error: couldn't open file.");
-        msgBox.exec();
-        return;
-      }
-      
-      label_progress->setText("Calculation done");
-      unlock_main_interface();
+      table_main_booth_data[col][i][j] += col_data.at(i).at(j);
     }
   }
-  else
+  
+  completed_threads++;
+  
+  if (completed_threads == current_threads)
   {
-    // Not a booth calculation.
-    int col = table_main_data.length() - 1;
-    
-    for (int i = 0; i < num_table_rows; i++)
+    // Sum each division's votes to get the division totals:
+    for (int i = 0; i < table_main_data.at(col).length(); i++)
     {
-      for (int k = 0; k < col_data.at(i).votes.length(); k++)
+      long state_votes = 0;
+      
+      for (int j = 0; j < table_main_booth_data.at(col).at(i).length(); j++)
       {
-        table_main_data[col][i].votes[k] += col_data.at(i).votes.at(k);
+        long this_votes = table_main_booth_data.at(col).at(i).at(j);
+        table_main_data[col][i].votes[booths.at(j).division_id] += this_votes;
+        state_votes += this_votes;
       }
+      
+      table_main_data[col][i].votes[divisions.length()] = state_votes;
     }
     
-    completed_threads++;
-    
-    if (completed_threads == current_threads)
+    if (!sort_ballot_order)
     {
-      // Sum the division votes to get the state totals:
-      for (int i = 0; i < table_main_data.at(col).length(); i++)
-      {
-        long state_votes = 0;
-        for (int k = 0; k < table_main_data.at(col).at(i).votes.length(); k++)
-        {
-          state_votes += table_main_data.at(col).at(i).votes.at(k);
-        }
-        
-        table_main_data[col][i].votes.replace(divisions.length(), state_votes);
-      }
+      sort_table_column(col);
+    }
+    
+    if (get_table_type() == "n_party_preferred")
+    {
+      // We should only be here for the initial setup of the NPP table,
+      // when we get the primary votes.
+      set_main_table_cells(col, true);
       
-      if (!sort_ballot_order)
-      {
-        sort_table_column(col);
-      }
+      int current_num_groups = get_num_groups();
+      int h = table_main->fontMetrics().boundingRect("0").height();
       
-      if (get_table_type() == "n_party_preferred")
+      for (int i = 0; i < current_num_groups; i++)
       {
-        // We should only be here for the initial setup of the NPP table,
-        // when we get the primary votes.
-        set_main_table_cells(col, true);
+        int group_id = table_main_data.at(0).at(i).group_id;
+        table_main_model->setItem(i, 1, new QStandardItem(table_main_groups_short.at(group_id)));
+        table_main_model->item(i, 1)->setTextAlignment(Qt::AlignCenter);
         
-        int current_num_groups = get_num_groups();
-        int h = table_main->fontMetrics().boundingRect("0").height();
-        
-        for (int i = 0; i < current_num_groups; i++)
+        if (!show_btl_headers)
         {
-          int group_id = table_main_data.at(0).at(i).group_id;
-          table_main_model->setItem(i, 1, new QStandardItem(table_main_groups_short.at(group_id)));
-          table_main_model->item(i, 1)->setTextAlignment(Qt::AlignCenter);
-          
-          if (!show_btl_headers)
-          {
-            table_main->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
-            table_main->verticalHeader()->setDefaultSectionSize(h);
-          }
+          table_main->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+          table_main->verticalHeader()->setDefaultSectionSize(h);
         }
       }
-      else
-      {
-        set_main_table_cells(col);
-      }
-      
-      label_progress->setText("Calculation done");
-      unlock_main_interface();
     }
     else
     {
-      label_progress->setText(QString("%1/%2 complete").arg(completed_threads).arg(current_threads));
+      set_main_table_cells(col);
     }
+    
+    label_progress->setText("Calculation done");
+    unlock_main_interface();
+  }
+  else
+  {
+    label_progress->setText(QString("%1/%2 complete").arg(completed_threads).arg(current_threads));
   }
 }
 
@@ -1397,7 +1348,7 @@ void Widget::write_sql_to_file(QString q)
   }
 }
 
-void Widget::do_sql_query_for_table(QString q, bool wide_table, bool by_booth)
+void Widget::do_sql_query_for_table(QString q, bool wide_table)
 {
   // If wide_table is true, then the SQL query q should return a table with
   // one row per division, and one column per group.
@@ -1408,29 +1359,24 @@ void Widget::do_sql_query_for_table(QString q, bool wide_table, bool by_booth)
   
   // I'm not sure if clicked_cells is ever longer than wanted, but just in case:
   QVector<int> relevant_clicked_cells;
-  int rel = by_booth ? 1 : 0;
   
-  for (int i = 0; i < table_main_data.length() - 1 - rel; i++)
+  for (int i = 0; i < table_main_data.length() - 1; i++)
   {
     relevant_clicked_cells.append(clicked_cells.at(i));
   }
   
   int current_num_groups = get_num_groups();
   
-  int num_geo_groups = by_booth ? booths.length() : divisions.length();
+  // Previously this might have been divisions.length(), but now
+  // all queries are booth-based:
+  int num_geo_groups = booths.length();
   
   int num_threads;
   QStringList queries = queries_threaded(q, num_threads);
   
   current_threads = num_threads;
   completed_threads = 0;
-  booth_calculation = by_booth;
-  
-  if (by_booth)
-  {
-    temp_booths_table_data.clear();
-  }
-  
+    
   lock_main_interface();
   label_progress->setText("Calculating...");
   
@@ -1441,18 +1387,17 @@ void Widget::do_sql_query_for_table(QString q, bool wide_table, bool by_booth)
                                                               database_file_path,
                                                               queries.at(i),
                                                               wide_table,
-                                                              wide_table && by_booth,
                                                               current_num_groups,
                                                               num_table_rows,
                                                               num_geo_groups,
                                                               relevant_clicked_cells);
     worker->moveToThread(thread);
     
-    connect(thread, SIGNAL(started()),                                        worker, SLOT(do_query()));
-    connect(worker, SIGNAL(finished_query(const QVector<Table_main_item> &)), this,   SLOT(process_thread_sql_main_table(const QVector<Table_main_item> &)));
-    connect(worker, SIGNAL(finished_query(const QVector<Table_main_item> &)), thread, SLOT(quit()));
-    connect(worker, SIGNAL(finished_query(const QVector<Table_main_item> &)), worker, SLOT(deleteLater()));
-    connect(thread, SIGNAL(finished()),                                       thread, SLOT(deleteLater()));
+    connect(thread, SIGNAL(started()),                                      worker, SLOT(do_query()));
+    connect(worker, SIGNAL(finished_query(const QVector<QVector<long>> &)), this,   SLOT(process_thread_sql_main_table(const QVector<QVector<long>> &)));
+    connect(worker, SIGNAL(finished_query(const QVector<QVector<long>> &)), thread, SLOT(quit()));
+    connect(worker, SIGNAL(finished_query(const QVector<QVector<long>> &)), worker, SLOT(deleteLater()));
+    connect(thread, SIGNAL(finished()),                                     thread, SLOT(deleteLater()));
     thread->start();
   }
 }
@@ -1872,12 +1817,24 @@ void Widget::set_main_table_cells(int col, bool n_party_preferred)
     }
     else
     {
-      if (!n_party_preferred                                           &&
-          col < clicked_cells.length()                                 &&
-          clicked_cells.at(col) == table_main_data.at(col).at(i).group_id)
+      if (n_party_preferred)
       {
-        highlight_cell(i, col);
+        if (clicked_cells_n_party.length() > 0                                   &&
+            clicked_cells_n_party.at(0).j == col                                 &&
+            clicked_cells_n_party.at(0).i == table_main_data.at(col).at(i).group_id)
+        {
+          highlight_cell(i, col);
+        }
       }
+      else
+      {
+        if (col < clicked_cells.length()                                 &&
+            clicked_cells.at(col) == table_main_data.at(col).at(i).group_id)
+        {
+          highlight_cell(i, col);
+        }
+      }
+      
     }
   }
   
@@ -1902,7 +1859,7 @@ void Widget::set_main_table_row_height()
   
 }
 
-void Widget::add_column_to_main_table(bool by_booth)
+void Widget::add_column_to_main_table()
 {
   // For table types that aren't n_party_preferred, this function does what it says
   // and adds a column to the main table.
@@ -1915,9 +1872,11 @@ void Widget::add_column_to_main_table(bool by_booth)
   QString table_type = get_table_type();
   int num_clicked_cells = clicked_cells.length();
   
-  QString geo_group = by_booth ? "booth_id" : "seat_id";
+  // Previously I allowed this to be "seat_id" as well; now all
+  // queries are booth-based.
+  QString geo_group = "booth_id";
   
-  if (!by_booth && table_type != "n_party_preferred" && num_clicked_cells != table_main_data.length())
+  if (table_type != "n_party_preferred" && num_clicked_cells != table_main_data.length())
   {
     QMessageBox msgBox;
     msgBox.setText("Internal error: Mismatch between table data length and clicked cells.  Oops. :(");
@@ -1925,40 +1884,29 @@ void Widget::add_column_to_main_table(bool by_booth)
     return;
   }
   
-  
   int col;
   
-  if (by_booth)
+  // Initialise a new column of the table data:
+  table_main_data.append(QVector<Table_main_item>());
+  table_main_booth_data.append(QVector<QVector<long>>());
+  col = table_main_data.length() - 1;
+  
+  for (int i = 0; i < num_table_rows; i++)
   {
-    // For the booth cross table, we're simulating clicking the column again.
-    col = table_main_data.length() - 2;
+    table_main_data[col].append(Table_main_item());
+    table_main_data[col][i].group_id = i;
+    table_main_data[col][i].sorted_idx = i;
+    table_main_data[col][i].votes = QVector<long>();
     
-    if ((table_type == "step_forward"  && num_clicked_cells == table_main_groups_short.length()) ||
-        (table_type == "first_n_prefs" && num_clicked_cells == get_n_first_prefs())              ||
-        (table_type == "later_prefs"   && num_clicked_cells == get_later_prefs_n_up_to())        ||
-        (table_type == "pref_sources"  && num_clicked_cells == 2))
+    for (int j = 0; j <= divisions.length(); j++)
     {
-      // Right-edge of table; the cross table is defined from one column earlier.
-      col++;
+      table_main_data[col][i].votes.append(0);
     }
-  }  
-  else
-  {
-    // Initialise a new column of the table data:
-    table_main_data.append(QVector<Table_main_item>());
-    col = table_main_data.length() - 1;
     
-    for (int i = 0; i < num_table_rows; i++)
+    table_main_booth_data[col].append(QVector<long>());
+    for (int j = 0; j < booths.length(); j++)
     {
-      table_main_data[col].append(Table_main_item());
-      table_main_data[col][i].group_id = i;
-      table_main_data[col][i].sorted_idx = i;
-      table_main_data[col][i].votes = QVector<long>();
-      
-      for (int j = 0; j <= divisions.length(); j++)
-      {
-        table_main_data[col][i].votes.append(0);
-      }
+      table_main_booth_data[col][i].append(0);
     }
   }
   
@@ -1982,7 +1930,7 @@ void Widget::add_column_to_main_table(bool by_booth)
     QString query = QString("SELECT %1, P%2, COUNT(P%2) FROM %3 %4 GROUP BY %1, P%2")
         .arg(geo_group).arg(this_pref).arg(get_abtl()).arg(query_where);
     
-    do_sql_query_for_table(query, false, by_booth);
+    do_sql_query_for_table(query, false);
   }
   else if (table_type == "first_n_prefs")
   {
@@ -2023,7 +1971,7 @@ void Widget::add_column_to_main_table(bool by_booth)
     
     query += QString(", COUNT(id) FROM %1 %2 GROUP BY %3").arg(get_abtl()).arg(query_where).arg(geo_group);
     
-    do_sql_query_for_table(query, true, by_booth);
+    do_sql_query_for_table(query, true);
   }
   else if (table_type == "later_prefs")
   {
@@ -2050,7 +1998,7 @@ void Widget::add_column_to_main_table(bool by_booth)
       QString query = QString("SELECT %1, P%2, COUNT(P%2) FROM %3 %4 GROUP BY %1, P%2")
           .arg(geo_group).arg(this_pref).arg(get_abtl()).arg(query_where);
       
-      do_sql_query_for_table(query, false, by_booth);
+      do_sql_query_for_table(query, false);
     }
     else
     {
@@ -2070,8 +2018,6 @@ void Widget::add_column_to_main_table(bool by_booth)
       // first-n-prefs-style WHERE clause (possibly empty):
       for (int i = fixed_prefs; i < col; i++)
       {
-        //query_where = QString("%1 AND Pfor%2 <= %3").arg(query_where).arg(clicked_cells.at(i)).arg(by_pref);
-        
         int gp = clicked_cells.at(i);
         
         QString cond;
@@ -2096,7 +2042,7 @@ void Widget::add_column_to_main_table(bool by_booth)
       
       query += QString(", COUNT(id) FROM %1 %2 GROUP BY %3").arg(get_abtl()).arg(query_where).arg(geo_group);
       
-      do_sql_query_for_table(query, true, by_booth);
+      do_sql_query_for_table(query, true);
     }
   }
   else if (table_type == "pref_sources")
@@ -2116,7 +2062,7 @@ void Widget::add_column_to_main_table(bool by_booth)
       
       query += QString(", COUNT(id) FROM %1 GROUP BY %2").arg(get_abtl()).arg(geo_group);
       
-      do_sql_query_for_table(query, true, by_booth);
+      do_sql_query_for_table(query, true);
     }
     else
     {
@@ -2133,70 +2079,74 @@ void Widget::add_column_to_main_table(bool by_booth)
                   .arg(geo_group).arg(get_abtl()).arg(clicked_cells.at(0)).arg(min_pref).arg(max_pref);
       }      
       
-      do_sql_query_for_table(query, false, by_booth);
+      do_sql_query_for_table(query, false);
     }
   }
   else if (table_type == "n_party_preferred")
   {
     QString query = QString("SELECT %1, P1, COUNT(P1) FROM %2 GROUP BY %1, P1").arg(geo_group).arg(get_abtl());
     
-    do_sql_query_for_table(query, false, by_booth);
+    do_sql_query_for_table(query, false);
   }
 }
 
 
-void Widget::calculate_n_party_preferred(bool by_booth)
+void Widget::calculate_n_party_preferred()
 {
   int n = get_n_preferred();
-  int num_divs;
-  QString geo_group;
-  booth_calculation = by_booth;
   
-  if (by_booth)
+  // Once upon a time, this might have been "seat_id":
+  QString geo_group = "booth_id";
+  
+  int num_geo_groups = booths.length();
+  
+  // *** Is this useless? ***
+  temp_booths_npp_data.clear();
+  
+  
+    
+  // Clear the table data, just in case.
+  for (int i = table_main_data.length() - 1; i > 0; i--)
   {
-    geo_group = "booth_id";
-    num_divs = booths.length();
-    temp_booths_npp_data.clear();
+    table_main_data.remove(i);
+    table_main_booth_data.remove(i);
   }
-  else
+  
+  // Initialise the table data:
+  for (int i = 0; i <= n; i++)
   {
-    geo_group = "seat_id";
-    num_divs = divisions.length();
+    table_main_data.append(QVector<Table_main_item>());
+    table_main_booth_data.append(QVector<QVector<long>>());
     
-    // Clear the table data, just in case.
-    for (int i = table_main_data.length() - 1; i > 0; i--)
+    for (int j = 0; j < num_table_rows; j++)
     {
-      table_main_data.remove(i);
-    }
-    
-    // Initialise the table data:
-    for (int i = 0; i <= n; i++)
-    {
-      table_main_data.append(QVector<Table_main_item>());
+      table_main_data[i + 1].append(Table_main_item());
+      table_main_data[i + 1][j].group_id = table_main_data.at(0).at(j).group_id;
+      table_main_data[i + 1][j].sorted_idx = table_main_data.at(0).at(j).sorted_idx;
+      table_main_data[i + 1][j].votes = QVector<long>();
+      table_main_data[i + 1][j].percentages = QVector<double>();
       
-      for (int j = 0; j < num_table_rows; j++)
+      for (int k = 0; k <= divisions.length(); k++)
       {
-        table_main_data[i + 1].append(Table_main_item());
-        table_main_data[i + 1][j].group_id = table_main_data.at(0).at(j).group_id;
-        table_main_data[i + 1][j].sorted_idx = table_main_data.at(0).at(j).sorted_idx;
-        table_main_data[i + 1][j].votes = QVector<long>();
-        table_main_data[i + 1][j].percentages = QVector<double>();
-        
-        for (int k = 0; k <= divisions.length(); k++)
-        {
-          table_main_data[i + 1][j].votes.append(0);
-          table_main_data[i + 1][j].percentages.append(0);
-        }
+        table_main_data[i + 1][j].votes.append(0);
+        table_main_data[i + 1][j].percentages.append(0);
+      }
+      
+      table_main_booth_data[i + 1].append(QVector<long>());
+      for (int k = 0; k < booths.length(); k++)
+      {
+        table_main_booth_data[i + 1][j].append(0);
       }
     }
-    
-    // The exhaust column for the table itself should not yet exist,
-    // so make it now.
-    table_main_model->setColumnCount(n + 3);
-    table_main_model->setHorizontalHeaderItem(n + 2, new QStandardItem("Exh"));
-    
-    table_main_model->horizontalHeaderItem(n+2)->setTextAlignment(Qt::AlignRight);
   }
+  
+  // The exhaust column for the table itself should not yet exist,
+  // so make it now.
+  table_main_model->setColumnCount(n + 3);
+  table_main_model->setHorizontalHeaderItem(n + 2, new QStandardItem("Exh"));
+  
+  table_main_model->horizontalHeaderItem(n+2)->setTextAlignment(Qt::AlignRight);
+
   
   
   
@@ -2271,16 +2221,16 @@ void Widget::calculate_n_party_preferred(bool by_booth)
                                                             database_file_path,
                                                             queries.at(i),
                                                             get_num_groups(),
-                                                            num_divs,
+                                                            num_geo_groups,
                                                             clicked_n_parties);
     
     worker->moveToThread(thread);
     
-    connect(thread, SIGNAL(started()),                                                 worker, SLOT(do_query()));
-    connect(worker, SIGNAL(finished_query(const QVector<QVector<Table_main_item>> &)), this,   SLOT(process_thread_sql_npp_table(const QVector<QVector<Table_main_item>> &)));
-    connect(worker, SIGNAL(finished_query(const QVector<QVector<Table_main_item>> &)), thread, SLOT(quit()));
-    connect(worker, SIGNAL(finished_query(const QVector<QVector<Table_main_item>> &)), worker, SLOT(deleteLater()));
-    connect(thread, SIGNAL(finished()),                                                thread, SLOT(deleteLater()));
+    connect(thread, SIGNAL(started()),                                               worker, SLOT(do_query()));
+    connect(worker, SIGNAL(finished_query(const QVector<QVector<QVector<long>>> &)), this,   SLOT(process_thread_sql_npp_table(const QVector<QVector<QVector<long>>> &)));
+    connect(worker, SIGNAL(finished_query(const QVector<QVector<QVector<long>>> &)), thread, SLOT(quit()));
+    connect(worker, SIGNAL(finished_query(const QVector<QVector<QVector<long>>> &)), worker, SLOT(deleteLater()));
+    connect(thread, SIGNAL(finished()),                                              thread, SLOT(deleteLater()));
     thread->start();
   }
   
@@ -2288,29 +2238,58 @@ void Widget::calculate_n_party_preferred(bool by_booth)
 }
 
 
-void Widget::process_thread_sql_npp_table(const QVector<QVector<Table_main_item>> &table)
+void Widget::process_thread_sql_npp_table(const QVector<QVector<QVector<long>>> &table)
 {
   int n = table.length() - 1;
   int current_num_groups = get_num_groups();
-  int num_divs = table.at(0).at(0).votes.length();
   
-  if (booth_calculation)
+  int num_divisions = divisions.length();
+  
+  for (int i = 0; i <= n; i++)
   {
-    if (temp_booths_npp_data.length() == 0)
+    for (int j = 0; j < current_num_groups; j++)
     {
-      for (int i = 0; i <= n; i++)
+      for (int k = 0; k < table.at(i).at(j).length(); k++)
       {
-        temp_booths_npp_data.append(QVector<Table_main_item>());
+        table_main_booth_data[i+1][j][k] += table.at(i).at(j).at(k);
+      }
+    }
+  }
+  
+  completed_threads++;
+  
+  if (completed_threads == current_threads)
+  {
+    // Sum each division's votes to get the division totals:
+    for (int i = 0; i <= n; i++)
+    {
+      for (int j = 0; j < current_num_groups; j++)
+      {
+        long state_votes = 0;
+        int sorted_i = table_main_data.at(i + 1).at(j).sorted_idx;
         
-        for (int j = 0; j < current_num_groups; j++)
+        for (int k = 0; k < table_main_booth_data.at(i+1).at(j).length(); k++)
         {
-          temp_booths_npp_data[i].append(Table_main_item());
-          temp_booths_npp_data[i][j].group_id = j;
-          
-          for (int k = 0; k < num_divs; k++)
-          {
-            temp_booths_npp_data[i][j].votes.append(0);
-          }
+          long this_votes = table_main_booth_data.at(i+1).at(j).at(k);
+          table_main_data[i+1][sorted_i].votes[booths.at(k).division_id] += this_votes;
+          state_votes += this_votes;
+        }
+        
+        table_main_data[i+1][sorted_i].votes[divisions.length()] = state_votes;
+      }
+    }
+    
+    
+    // Calculate the percentages
+    for (int i = 0; i <= n; i++)
+    {
+      for (int j = 0; j < current_num_groups; j++)
+      {
+        for (int k = 0; k <= num_divisions; k++)
+        {
+          long total = table_main_data.at(0).at(j).votes.at(k);
+          long votes = table_main_data.at(i+1).at(j).votes.at(k);
+          table_main_data[1+i][j].percentages[k] = 100. * votes / total;
         }
       }
     }
@@ -2318,200 +2297,17 @@ void Widget::process_thread_sql_npp_table(const QVector<QVector<Table_main_item>
     
     for (int i = 0; i <= n; i++)
     {
-      for (int j = 0; j < current_num_groups; j++)
-      {
-        for (int k = 0; k < num_divs; k++)
-        {
-          temp_booths_npp_data[i][j].votes[k] += table.at(i).at(j).votes.at(k);
-        }
-      }
+      set_main_table_cells(i+1, true);
     }
     
-    completed_threads++;
-    
-    if (completed_threads == current_threads)
-    {
-      QFile out_file(booths_output_file);
-      
-      QString value_type = get_value_type();
-      
-      int num_booths = booths.length();
-      if (num_booths != temp_booths_npp_data.at(0).at(0).votes.length())
-      {
-        QMessageBox msgBox;
-        msgBox.setText("Internal error: wrong number of booths in output.");
-        msgBox.exec();
-        unlock_main_interface();
-        return;
-      }
-      
-      // I actually have enough data here to dump every group's NPP from every
-      // booth to CSV, but for now I'll just work with the selected group.
-      int group_id = clicked_cells_n_party.at(0).i;
-      
-      int num_input_cols = temp_booths_npp_data.length();
-      if (num_input_cols != n + 1)
-      {
-        QMessageBox msgBox;
-        msgBox.setText("Internal error: wrong number of groups in output.");
-        msgBox.exec();
-        unlock_main_interface();
-        return;
-      }
-      
-      
-      if (out_file.open(QIODevice::WriteOnly))
-      {
-        QTextStream out(&out_file);
-        
-        QString title = label_division_table_title->text();
-        title.replace("<b>", "");
-        title.replace("</b>", "");
-        
-        out << title << endl;
-        
-        QString header("Division,Booth,Longitude,Latitude,Total,Base");
-        
-        for (int i = 0; i < n; i++)
-        {
-          header = QString("%1,%2").arg(header).arg(table_main_groups_short.at(clicked_n_parties.at(i)));
-        }
-        header = QString("%1,Exh").arg(header);
-        
-        out << header << endl;
-        
-        for (int i = 0; i < num_booths; i++)
-        {
-          QString line = QString("%1,\"%2\",%3,%4,%5")
-              .arg(booths.at(i).division).arg(booths.at(i).booth)
-              .arg(booths.at(i).longitude).arg(booths.at(i).latitude)
-              .arg(booths.at(i).formal_votes);
-          
-          long base = 0;
-          for (int j = 0; j <= n; j++)
-          {
-            base += temp_booths_npp_data.at(j).at(group_id).votes.at(i);
-          }
-          
-          if (value_type == "votes")
-          {
-            line = QString("%1,%2").arg(line).arg(base);
-          }
-          else
-          {
-            if (booths.at(i).formal_votes == 0)
-            {
-              line = QString("%1,0").arg(line);
-            }
-            else
-            {
-              line = QString("%1,%2").arg(line).arg(100. * base / booths.at(i).formal_votes, 0, 'f', 2);
-            }
-          }
-          
-          for (int j = 0; j <= n; j++)
-          {
-            if (base == 0)
-            {
-              line = QString("%1,0").arg(line);
-            }
-            else
-            {
-              if (value_type == "votes")
-              {
-                line = QString("%1,%2").arg(line).arg(temp_booths_npp_data.at(j).at(group_id).votes.at(i));
-              }
-              else if (value_type == "percentages")
-              {
-                line = QString("%1,%2").arg(line).arg(100. * temp_booths_npp_data.at(j).at(group_id).votes.at(i) / base, 0, 'f', 2);
-              }
-              else if (value_type == "total_percentages")
-              {
-                line = QString("%1,%2").arg(line).arg(100. * temp_booths_npp_data.at(j).at(group_id).votes.at(i) / booths.at(i).formal_votes, 0, 'f', 2);
-              }
-              
-            }
-          }
-          
-          out << line << endl;
-        }
-        
-        out_file.close();
-      }
-      
-      label_progress->setText("Calculation done");
-      unlock_main_interface();
-    }
-    else
-    {
-      label_progress->setText(QString("%1/%2 complete").arg(completed_threads).arg(current_threads));
-    }
+    label_progress->setText("Calculation done");
+    unlock_main_interface();
   }
   else
   {
-    int num_divisions = divisions.length();
-    
-    for (int i = 0; i <= n; i++)
-    {
-      for (int j = 0; j < current_num_groups; j++)
-      {
-        int sorted_i = table_main_data.at(1 + i).at(j).sorted_idx;
-        
-        for (int k = 0; k < num_divisions; k++)
-        {
-          table_main_data[1+i][sorted_i].votes[k] += table.at(i).at(j).votes.at(k);
-        }
-      }
-    }
-    
-    completed_threads++;
-    
-    if (completed_threads == current_threads)
-    {
-      // Calculate the percentages
-      for (int i = 0; i <= n; i++)
-      {
-        for (int j = 0; j < current_num_groups; j++)
-        {
-          for (int k = 0; k < num_divisions; k++)
-          {
-            long primaries = table_main_data.at(0).at(j).votes.at(k);
-            long votes = table_main_data.at(i+1).at(j).votes.at(k);
-            table_main_data[1+i][j].percentages[k] = 100. * votes / primaries;
-          }
-        }
-      }
-      
-      for (int i = 0; i <= n; i++)
-      {
-        for (int j = 0; j < table_main_data.at(i+1).length(); j++)
-        {
-          long state_votes = 0;
-          for (int k = 0; k < table_main_data.at(i+1).at(j).votes.length(); k++)
-          {
-            state_votes += table_main_data.at(i+1).at(j).votes.at(k);
-          }
-          
-          table_main_data[i+1][j].votes.replace(divisions.length(), state_votes);
-          
-          long primaries = table_main_data.at(0).at(j).votes.at(divisions.length());
-          table_main_data[i+1][j].percentages.replace(divisions.length(), 100. * state_votes / primaries);
-        }
-      }
-      
-      for (int i = 0; i <= n; i++)
-      {
-        set_main_table_cells(i+1, true);
-      }
-      
-      label_progress->setText("Calculation done");
-      unlock_main_interface();
-    }
-    else
-    {
-      label_progress->setText(QString("%1/%2 complete").arg(completed_threads).arg(current_threads));
-    }
+    label_progress->setText(QString("%1/%2 complete").arg(completed_threads).arg(current_threads));
   }
+  
 }
 
 void Widget::make_cross_table()
@@ -2897,6 +2693,9 @@ void Widget::set_title_from_divisions_table()
   QString value_type = get_value_type();
   QString table_type = get_table_type();
   QString standard_title = label_division_table_title->text();
+  
+  standard_title.replace("&nbsp;", " ");
+  
   int n = clicked_cells.length();
   
   divisions_cross_table_title = "";
@@ -3177,10 +2976,97 @@ void Widget::make_booths_cross_table()
                                                     latest_out_path,
                                                     "*.csv");
   
-  
   if (booths_output_file == "") { return; }
   
-  add_column_to_main_table(true);
+  QFile out_file(booths_output_file);
+  
+  if (out_file.open(QIODevice::WriteOnly))
+  {
+    QTextStream out(&out_file);
+    int num_output_cols = table_main_groups_short.length() + 1;
+    QString value_type = get_value_type();
+    long num_booths = booths.length();
+    
+    set_title_from_divisions_table();
+    QString title_line = QString("\"%1\"").arg(divisions_cross_table_title);
+    
+    out << title_line << endl;
+    
+    QString header("Division,Booth,Longitude,Latitude,Total,Base");
+    
+    for (int i = 0; i < num_output_cols - 1; i++)
+    {
+      header = QString("%1,%2").arg(header).arg(get_short_group(i));
+    }
+    header = QString("%1,Exh").arg(header);
+    
+    out << header << endl;
+    
+    for (int i = 0; i < num_booths; i++)
+    {
+      QString line = QString("%1,\"%2\",%3,%4,%5")
+          .arg(booths.at(i).division).arg(booths.at(i).booth)
+          .arg(booths.at(i).longitude).arg(booths.at(i).latitude)
+          .arg(booths.at(i).formal_votes);
+      
+      long base = 0;
+      int col = clicked_cells.length() - 1;
+      int base_col = col - 1;
+      
+      if (base_col < 0)
+      {
+        base = booths.at(i).formal_votes;
+      }
+      else
+      {
+        base = table_main_booth_data.at(base_col).at(clicked_cells.at(base_col)).at(i);
+      }
+      
+      if (value_type == "votes")
+      {
+        line = QString("%1,%2").arg(line).arg(base);
+      }
+      else
+      {
+        double val = booths.at(i).formal_votes == 0 ? 0. : 100. * base / booths.at(i).formal_votes;
+        line = QString("%1,%2").arg(line).arg(val, 0, 'f', 2);
+      }
+      
+      for (int j = 0; j < num_output_cols; j++)
+      {
+        long votes = table_main_booth_data.at(col).at(j).at(i);
+        
+        if (value_type == "votes")
+        {
+          line = QString("%1,%2").arg(line).arg(votes);
+        }
+        else if (value_type == "percentages")
+        {
+          double val = base == 0 ? 0. : 100. * votes / base;
+          line = QString("%1,%2").arg(line).arg(val, 0, 'f', 2);
+        }
+        else if (value_type == "total_percentages")
+        {
+          double val = booths.at(i).formal_votes == 0 ? 0. : 100. * votes / booths.at(i).formal_votes;
+          line = QString("%1,%2").arg(line).arg(val, 0, 'f', 2);
+        }
+      }
+      
+      out << line << endl;
+    }
+    
+    out_file.close();
+  }
+  else
+  {
+    QMessageBox msgBox;
+    msgBox.setText("Error: couldn't open file.");
+    msgBox.exec();
+  }
+  
+  label_progress->setText("Calculation done");
+  unlock_main_interface();
+  
   update_output_path(booths_output_file, "csv");
 }
 
@@ -3452,6 +3338,7 @@ QString Widget::get_groups_table()
 void Widget::reset_table()
 {
   table_main_data.clear();
+  table_main_booth_data.clear();
   table_main_model->clear();
   clicked_cells.clear();
   clicked_n_parties.clear();
@@ -3525,6 +3412,7 @@ void Widget::change_value_type(int i)
     spinbox_map_min->setDecimals(0);
     spinbox_map_max->setDecimals(0);
     map_divisions_model.set_decimals(0);
+    map_booths_model.set_decimals_mouseover(0);
   }
   else
   {
@@ -3533,6 +3421,7 @@ void Widget::change_value_type(int i)
     spinbox_map_min->setDecimals(1);
     spinbox_map_max->setDecimals(1);
     map_divisions_model.set_decimals(1);
+    map_booths_model.set_decimals_mouseover(1);
   }
   
   if (table_divisions_data.length() > 0)
@@ -3546,12 +3435,12 @@ void Widget::change_value_type(int i)
 void Widget::change_division(int i)
 {
   // When the selected division changes, the only change
-  // is to the table.  (*** Unless maybe in future I have booth-level
-  // maps ***)
-  
-  Q_UNUSED(i);
+  // is to the table and to the booth map.
   
   if (doing_calculation) { return; }
+  
+  if (i == divisions.length()) { i = -1; }
+  map_booths_model.update_active_division(i);
   
   if (get_table_type() == "n_party_preferred")
   {
@@ -3612,6 +3501,46 @@ void Widget::change_pref_sources_max(int i)
   if (doing_calculation) { return; }
   spinbox_pref_sources_min->setMaximum(get_pref_sources_max());
   spinbox_change();
+}
+
+void Widget::change_map_type()
+{
+  QString map_type = get_map_type();
+  QString map_booth_type = get_map_booth_type();
+  
+  if (map_type == "divisions")
+  {
+    label_map_booth_min_1->hide();
+    label_map_booth_min_2->hide();
+    spinbox_map_booth_threshold->hide();
+    
+    map_booths_model.set_type("none");
+    map_divisions_model.set_fill_visible(true);
+  }
+  else 
+  {
+    label_map_booth_min_1->show();
+    label_map_booth_min_2->show();
+    spinbox_map_booth_threshold->show();
+    
+    map_divisions_model.set_fill_visible(false);
+    map_booths_model.update_prepoll_flag(map_type == "booths_prepoll");
+    map_booths_model.set_idle(false);
+    update_map_booths();
+    map_booths_model.set_type(map_booth_type);
+  }
+}
+
+/*
+void Widget::change_map_booth_type()
+{
+  map_booths_model.set_type(get_map_booth_type());
+}
+*/
+
+void Widget::change_map_booth_threshold(int i)
+{
+  map_booths_model.update_min_votes(i);
 }
 
 void Widget::update_map_scale_minmax()
@@ -4162,17 +4091,106 @@ void Widget::fill_in_divisions_table()
     }
   }
   
+  // Ensure that the spinboxes for min and max of the color
+  // scale are different:
+  if (value_type == "votes")
+  {
+    if (max_value - min_value < 0.5)
+    {
+      max_value += 1.;
+    }
+  }
+  else
+  {
+    if (qRound(10. * max_value) == qRound(10. * min_value))
+    {
+      if (max_value > 98.)
+      {
+        min_value -= 1.;
+      }
+      else
+      {
+        max_value += 1.;
+      }
+    }
+  }
+  
   spinbox_map_min->setMaximum(max_value);
   spinbox_map_max->setMinimum(min_value);
   spinbox_map_min->setValue(min_value);
   spinbox_map_max->setValue(max_value);
   
-  // Following is usually not needed, but is needed if
+  // Following is usually not needed, but _is_ needed if
   // the min/max spinboxes didn't change just now:
   map_divisions_model.set_colors();
   
+  if (get_map_type() != "divisions")
+  {
+    update_map_booths();
+  }
+  
   map_scale_min_default = min_value;
   map_scale_max_default = max_value;
+}
+
+void Widget::update_map_booths()
+{
+  QString value_type = get_value_type();
+  
+  long num_booths = booths.length();
+  int col, base_col, row, base_row;
+  
+  if (get_table_type() == "n_party_preferred")
+  {
+    base_col = 0;
+    if (clicked_cells_n_party.length() == 0) { return; }
+    
+    col = clicked_cells_n_party.at(0).j - 1;
+    row = clicked_cells_n_party.at(0).i;
+    base_row = row;
+  }
+  else
+  {
+    col = clicked_cells.length() - 1;
+    if (col < 0) { return; }
+    
+    base_col = col - 1;
+    row = clicked_cells.at(col);
+    base_row = base_col >= 0 ? clicked_cells.at(base_col) : 0;
+  }
+  
+  for (long j = 0; j < num_booths; j++)
+  {
+    long votes = table_main_booth_data.at(col).at(row).at(j);
+    long denom;
+    double value = 0.;
+    
+    if (value_type == "votes")
+    {
+      value = static_cast<double>(votes);
+    }
+    else if (value_type == "percentages")
+    {
+      if (base_col < 0)
+      {
+        denom = booths.at(j).formal_votes;
+      }
+      else
+      {
+        denom = table_main_booth_data.at(base_col).at(base_row).at(j);
+      }
+      
+      value = denom == 0 ? 0. : 100. * votes / denom;
+    }
+    else if (value_type == "total_percentages")
+    {
+      value = booths.at(j).formal_votes == 0 ? 0. : 100. * votes / booths.at(j).formal_votes;
+    }
+    
+    map_booths_model.set_value(j, value);
+  }
+  
+  map_booths_model.set_colors();
 }
 
 void Widget::set_divisions_table()
@@ -4268,6 +4286,7 @@ void Widget::clicked_main_table(const QModelIndex &index)
       for (int s = table_main_data.length() - 1; s > 0; --s)
       {
         table_main_data.remove(s);
+        table_main_booth_data.remove(s);
       }
       
       table_main_model->setColumnCount(2 + clicked_n_parties.length());
@@ -4436,6 +4455,7 @@ void Widget::clicked_main_table(const QModelIndex &index)
     for (int s = table_main_data.length() - 1; s > j; s--)
     {
       table_main_data.remove(s);
+      table_main_booth_data.remove(s);
       for (int r = 0; r < num_table_rows; ++r)
       {
         table_main_model->setItem(r, s, new QStandardItem(""));
@@ -4503,6 +4523,7 @@ void Widget::clear_divisions_table()
   label_division_table_title->setText("<b>No selection</b>");
   
   map_divisions_model.clear_values();
+  map_booths_model.clear_values();
   label_map_title->setText("<b>No selection</b>");
   
   button_divisions_copy->setEnabled(false);
@@ -4645,6 +4666,22 @@ QString Widget::get_output_path(QString file_type)
   }
   
   return latest_out_path;
+}
+
+QString Widget::get_map_type()
+{
+  return combo_map_type->currentData().toString();
+}
+
+QString Widget::get_map_booth_type()
+{
+  //return combo_map_booth_type->currentData().toString();
+  return "text";
+}
+
+int Widget::get_map_booth_threshold()
+{
+  return spinbox_map_booth_threshold->value();
 }
 
 void Widget::update_output_path(QString file_name, QString file_type)
@@ -4890,6 +4927,121 @@ void Widget::zoom_to_capital()
   }
 }
 
+double Widget::longitude_to_x(double longitude, double center_longitude, double zoom, int size)
+{
+  double tile_x = pow(2., zoom) * (center_longitude + 180.)/360.;
+  double tx = pow(2., zoom) * (longitude + 180.) / 360.;
+  return 256. * (tx - tile_x) + size/2.;
+}
+
+double Widget::latitude_to_y(double latitude, double center_latitude, double zoom, int size)
+{
+  double tile_y = pow(2., zoom - 1.) * (1. - log(tan(center_latitude/rad2deg) + 1./cos(center_latitude/rad2deg)) / M_PI);
+  double n = asinh(tan(latitude / rad2deg));
+  double ty = pow(2., zoom) * (M_PI - n) / (2. * M_PI);
+  return 256. * (ty - tile_y) + size/2.;
+}
+
+double Widget::x_to_longitude(double x, double center_longitude, double zoom, int size)
+{
+  double tile_x = pow(2., zoom) * (center_longitude + 180.)/360.;
+  double tx = tile_x + (x - size/2)/256.;
+  return 360. * tx / pow(2.0, zoom) - 180.;
+}
+
+double Widget::y_to_latitude(double y, double center_latitude, double zoom, int size)
+{
+  double tile_y = pow(2., zoom - 1.) * (1. - log(tan(center_latitude/rad2deg) + 1./cos(center_latitude/rad2deg)) / M_PI);
+  double ty = tile_y + (y - size/2)/256.;
+  double n = M_PI - 2. * M_PI * ty / pow(2., zoom);
+  return rad2deg * atan(sinh(n));
+}
+
+void Widget::zoom_to_division()
+{
+  if (!opened_database || !qml_map) { return; }
+  int div = get_current_division();
+  if (div == divisions.length()) { return; }
+  zoom_to_division(div);
+}
+
+void Widget::zoom_to_division(int div)
+{
+  offset_set_map_center = !offset_set_map_center;
+  
+  // My iterative approach seems unnecessary:
+  int max_iter = 1;
+  
+  int size = qml_map_container->get_size();
+  const double log2 = log(2.);
+  
+  // Latitude:
+  double min_lat = division_bboxes.at(div).min_latitude;
+  double max_lat = division_bboxes.at(div).max_latitude;
+  
+  double lat = 0.5*(min_lat + max_lat);
+  double zoom = 4.;
+  
+  double y1, y2;
+  double y1_target = 40.;
+  
+  for (int i = 0; i < max_iter; i++)
+  {
+    // Adjust center:
+    y1 = latitude_to_y(max_lat, lat, zoom, size);
+    y2 = latitude_to_y(min_lat, lat, zoom, size);
+    lat = y_to_latitude(0.5*(y1 + y2), lat, zoom, size);
+    
+    // Adjust zoom:
+    y1 = latitude_to_y(max_lat, lat, zoom, size);
+    y2 = latitude_to_y(min_lat, lat, zoom, size);
+    zoom -= log((y1 - size/2.) / (y1_target - size/2.)) / log2;
+  }
+  
+  double ideal_zoom_lat = zoom;
+  
+  // Longitude:
+  double min_lon = division_bboxes.at(div).min_longitude;
+  double max_lon = division_bboxes.at(div).max_longitude;
+  double lon = 0.5*(min_lon + max_lon);
+  zoom = 4.;
+  double x1, x2;
+  double x1_target = 40.;
+  
+  for (int i = 0; i < max_iter; i++)
+  {
+    // Adjust center:
+    x1 = longitude_to_x(min_lon, lon, zoom, size);
+    x2 = longitude_to_x(max_lon, lon, zoom, size);
+    lon = x_to_longitude(0.5*(x1 + x2), lon, zoom, size);
+    
+    // Adjust zoom:
+    x1 = longitude_to_x(min_lon, lon, zoom, size);
+    x2 = longitude_to_x(max_lon, lon, zoom, size);
+    zoom -= log((x1 - size/2.) / (x1_target - size/2.)) / log2;
+  }
+  
+  double ideal_zoom_lon = zoom;
+  
+  zoom = qMin(ideal_zoom_lon, ideal_zoom_lat);
+  
+  // At least on my computer, the zoom increments by +/- 0.12:
+  int n = static_cast<int>((zoom - 1.) / 0.12) + 1;
+  zoom = 1. + 0.12*n;
+  
+  if (offset_set_map_center)
+  {
+    lon += 1e-6;
+    lat += 1e-6;
+    zoom += 1e-6;
+  }
+  
+  qml_map->setProperty("longitude", lon);
+  qml_map->setProperty("latitude", lat);
+  qml_map->setProperty("zoom_level", zoom);
+  qml_map_container->update_coords();
+}
+
 QPixmap Widget::get_pixmap_for_map()
 {
   QPoint main_window_corner = this->mapToGlobal(QPoint(0, 0));
@@ -4966,7 +5118,96 @@ void Widget::export_booths_table()
   
   if (booths_output_file == "") { return; }
   
-  calculate_n_party_preferred(true);
+  // *** new routine here ***
+  
+  QFile out_file(booths_output_file);
+  QString value_type = get_value_type();
+  
+  if (out_file.open(QIODevice::WriteOnly))
+  {
+    QTextStream out(&out_file);
+    
+    int n = table_main_booth_data.length() - 2;
+    long num_booths = booths.length();
+    int from_group = clicked_cells_n_party.at(0).i;
+    
+    QString title = label_division_table_title->text();
+    title.replace("<b>", "");
+    title.replace("</b>", "");
+    title.replace("&nbsp;", " ");
+    out << title << endl;
+    
+    QString header("Division,Booth,Longitude,Latitude,Total,Base");
+    for (int i = 0; i < n; i++)
+    {
+      header = QString("%1,%2").arg(header).arg(table_main_groups_short.at(clicked_n_parties.at(i)));
+    }
+    header = QString("%1,Exh").arg(header);
+    out << header << endl;
+    
+    for (int i = 0; i < num_booths; i++)
+    {
+      QString line = QString("%1,\"%2\",%3,%4,%5")
+          .arg(booths.at(i).division).arg(booths.at(i).booth)
+          .arg(booths.at(i).longitude).arg(booths.at(i).latitude)
+          .arg(booths.at(i).formal_votes);
+      
+      long base = table_main_booth_data.at(0).at(from_group).at(i);
+      
+      if (value_type == "votes")
+      {
+        line = QString("%1,%2").arg(line).arg(base);
+      }
+      else
+      {
+        if (booths.at(i).formal_votes == 0)
+        {
+          line = QString("%1,0").arg(line);
+        }
+        else
+        {
+          line = QString("%1,%2").arg(line).arg(100. * base / booths.at(i).formal_votes, 0, 'f', 2);
+        }
+      }
+      
+      for (int j = 0; j <= n; j++)
+      {
+        if (base == 0)
+        {
+          line = QString("%1,0").arg(line);
+        }
+        else
+        {
+          if (value_type == "votes")
+          {
+            line = QString("%1,%2").arg(line).arg(table_main_booth_data.at(j + 1).at(from_group).at(i));
+          }
+          else if (value_type == "percentages")
+          {
+            line = QString("%1,%2").arg(line).arg(100. * table_main_booth_data.at(j + 1).at(from_group).at(i) / base, 0, 'f', 2);
+          }
+          else if (value_type == "total_percentages")
+          {
+            line = QString("%1,%2").arg(line).arg(100. * table_main_booth_data.at(j + 1).at(from_group).at(i) / booths.at(i).formal_votes, 0, 'f', 2);
+          }
+        }
+      }
+      
+      out << line << endl;
+    }
+    
+    out_file.close();
+  }
+  else
+  {
+    QMessageBox msgBox;
+    msgBox.setText("Error: couldn't open file.");
+    msgBox.exec();
+  }
+  
+  label_progress->setText("Calculation done");
+  unlock_main_interface();
+  
   update_output_path(booths_output_file, "csv");
 }
 
@@ -4988,9 +5229,9 @@ void Widget::show_help()
   help->setWindowTitle("Help");
   
   QLabel *label_help = new QLabel();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 1.1, 2019-07-07."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 1.2, 2019-07-21."
                       "<br><br>Such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
-                      "https://pappubahry.com/pseph/senate_pref/</a>.  You'll need to download specially made SQLITE files, which hold the preference "
+                      "https://pappubahry.com/pseph/senate_pref/</a>.  You'll need to download specially made SQLite files, which hold the preference "
                       "data in the format expected by this program.  You can then open these by clicking on the 'Load preferences' button."
                       "<br><br>This software was made with Qt Creator, using Qt 5.12: <a href=\"https://www.qt.io/\">https://www.qt.io/</a>; Qt components"
                       " are licensed under (L)GPL.  My own code is public domain."

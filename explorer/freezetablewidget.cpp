@@ -4,7 +4,6 @@
 #include "freezetablewidget.h"
 #include <QHeaderView>
 #include <QScrollBar>
-#include <QDebug>
 #include <QFontMetrics>
 #include <QFont>
 

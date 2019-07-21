@@ -5,7 +5,6 @@
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QFile>
-#include <QDebug>
 
 Worker_setup_polygon::Worker_setup_polygon(QString state,
                                            int year,

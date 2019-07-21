@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
   w.setFocusPolicy(Qt::ClickFocus);
   
   w.setWindowTitle("Senate preference explorer");
-  w.resize(1250, 700);
+  w.resize(1250, 720);
   w.setMinimumSize(QSize(500, 500));
   w.show();
 

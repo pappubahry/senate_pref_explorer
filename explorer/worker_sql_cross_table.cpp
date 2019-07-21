@@ -4,7 +4,6 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
-#include <QDebug>
 
 Worker_sql_cross_table::Worker_sql_cross_table(QString table_type,
                                                int thread_num,

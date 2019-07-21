@@ -12,8 +12,10 @@
 #include <QThread>
 #include <QQuickWidget>
 #include <table_window.h>
-#include "polygon_model.h"
 #include "map_container.h"
+#include "polygon_model.h"
+#include "booth_model.h"
+
 
 struct Table_main_item
 {
@@ -35,16 +37,6 @@ struct Table_divisions_item
   QVector<double> total_percentage;
 };
 
-struct Booth
-{
-  int id;
-  QString division;
-  QString booth;
-  double longitude;
-  double latitude;
-  long formal_votes;
-};
-
 struct N_party_click_cell
 {
   int i;
@@ -55,6 +47,14 @@ struct Arbitrary_col_sort
 {
   int i;
   bool is_descending;
+};
+
+struct Bounding_box
+{
+  double min_longitude;
+  double max_longitude;
+  double min_latitude;
+  double max_latitude;
 };
 
 // https://wiki.qt.io/Clickable_QLabel
@@ -81,8 +81,8 @@ public:
   ~Widget();
 
 private slots:
-  void process_thread_sql_main_table(const QVector<Table_main_item> &);
-  void process_thread_sql_npp_table(const QVector<QVector<Table_main_item>> &);
+  void process_thread_sql_main_table(const QVector<QVector<long>> &);
+  void process_thread_sql_npp_table(const QVector<QVector<QVector<long>>> &);
   void process_thread_sql_cross_table(const QVector<QVector<long>> &);
   void open_database();
   void clicked_main_table(const QModelIndex &index);
@@ -95,9 +95,12 @@ private slots:
   void change_later_prefs_up_to(int i);
   void change_pref_sources_min(int i);
   void change_pref_sources_max(int i);
+  void change_map_type();
+  //void change_map_booth_type();
+  void change_map_booth_threshold(int i);
   void update_map_scale_minmax();
-  void calculate_n_party_preferred(bool by_booth = false);
-  void add_column_to_main_table(bool by_booth = false);
+  void calculate_n_party_preferred();
+  void add_column_to_main_table();
   void make_cross_table();
   void make_divisions_cross_table();
   void make_booths_cross_table();
@@ -115,12 +118,15 @@ private slots:
   void reset_map_scale();
   void zoom_to_state();
   void zoom_to_capital();
+  void zoom_to_division();
+  void zoom_to_division(int div);
   void copy_map();
   void export_map();
   void delayed_copy_map();
   void delayed_export_map(QString file_name);
   
 private:
+  const double rad2deg = 57.2957795131;
   QPushButton *button_load;
   QLabel *label_load;
   QComboBox *combo_abtl;
@@ -154,16 +160,22 @@ private:
   QPushButton *button_divisions_booths_export;
   QPushButton *button_divisions_cross_table;
   QPushButton *button_booths_cross_table;
+  QComboBox *combo_map_type;
+  QComboBox *combo_map_booth_type;
+  QLabel *label_map_booth_min_1;
+  QLabel *label_map_booth_min_2;
+  QSpinBox *spinbox_map_booth_threshold;
   QTableView *table_main;
   QTableView *table_divisions;
   QStandardItemModel *table_main_model;
   QStandardItemModel *table_divisions_model;
   QVector<QVector<Table_main_item>> table_main_data;
   QVector<Table_divisions_item> table_divisions_data;
+  QVector<QVector<QVector<long>>> table_main_booth_data;
   QVector<QVector<long>> cross_table_data;
-  QVector<Table_main_item> temp_booths_table_data;
   QVector<QVector<Table_main_item>> temp_booths_npp_data;
   Polygon_model map_divisions_model;
+  Booth_model map_booths_model;
   Map_container *qml_map_container;
   QObject *qml_map;
   QDoubleSpinBox *spinbox_map_min;
@@ -187,6 +199,7 @@ private:
   int num_cands;
   int num_table_rows;
   QStringList divisions;
+  QVector<Bounding_box> division_bboxes;
   int year;
   QString state_short;
   QString state_full;
@@ -203,7 +216,6 @@ private:
   int current_threads;
   int completed_threads;
   bool doing_calculation;
-  bool booth_calculation;
   int one_line_height;
   int two_line_height;
   double map_scale_min_default = 0.;
@@ -222,7 +234,7 @@ private:
   void set_all_main_table_cells();
   void set_main_table_row_height();
   void make_main_table_row_headers(bool is_blank);
-  void do_sql_query_for_table(QString q, bool wide_table = false, bool by_booth = false);
+  void do_sql_query_for_table(QString q, bool wide_table = false);
   void set_divisions_table();
   void set_divisions_map();
   void sort_table_column(int i);
@@ -234,6 +246,7 @@ private:
   void clear_divisions_table();
   void set_divisions_table_title();
   void fill_in_divisions_table();
+  void update_map_booths();
   void sort_divisions_table_data();
   void lock_main_interface();
   void unlock_main_interface();
@@ -254,6 +267,9 @@ private:
   QString get_groups_table();
   QString get_short_group(int i);
   QString get_output_path(QString file_type);
+  QString get_map_type();
+  QString get_map_booth_type();
+  int get_map_booth_threshold();
   int get_width_from_text(QString t, QWidget *w, int buffer = 30);
   int get_num_groups();
   int get_n_preferred();
@@ -273,6 +289,10 @@ private:
   void highlight_cell_n_party_preferred(int i, int j);
   void unhighlight_cell(int i, int j);
   QPixmap get_pixmap_for_map();
+  double longitude_to_x(double longitude, double center_longitude, double zoom, int size);
+  double latitude_to_y(double latitude, double center_latitude, double zoom, int size);
+  double x_to_longitude(double x, double center_longitude, double zoom, int size);
+  double y_to_latitude(double y, double center_latitude, double zoom, int size);
 };
 
 #endif // MAIN_WIDGET_H

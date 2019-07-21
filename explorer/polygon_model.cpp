@@ -1,6 +1,5 @@
 #include "polygon_model.h"
 
-#include <QDebug>
 #include <QImage>
 #include <QMessageBox>
 #include <QThread>
@@ -117,7 +116,18 @@ void Polygon_model::set_label(QLabel *label)
 
 void Polygon_model::set_decimals(int n)
 {
-  decimals = n;
+  _decimals = n;
+}
+
+void Polygon_model::set_fill_visible(bool visible)
+{
+  fill_polygons = visible;
+  double opacity = visible ? default_opacity : 0.;
+  for (int i = 0; i < _polygons.length(); i++)
+  {
+    QModelIndex index = this->index(i);
+    setData(index, opacity, Opacity_role);
+  }
 }
 
 void Polygon_model::point_in_polygon(double x, double y)
@@ -187,20 +197,23 @@ void Polygon_model::point_in_polygon(double x, double y)
     if (this_div != current_mouseover_division)
     {
       QModelIndex index;
-      if (current_mouseover_division >= 0)
+      if (current_mouseover_division >= 0 && fill_polygons)
       {
         index = this->index(_polygon_ids.at(current_mouseover_division).at(0));
-        setData(index, 0.5, Opacity_role);
+        setData(index, default_opacity, Opacity_role);
       }
       
       current_mouseover_division = this_div;
       
       _label_division_info->setText(QString("%1: %2")
                                     .arg(_polygons.at(poly).division_name)
-                                    .arg(_polygons.at(poly).value, 0, 'f', decimals));
+                                    .arg(_polygons.at(poly).value, 0, 'f', _decimals));
       
       index = this->index(poly);
-      setData(index, 1., Opacity_role);
+      if (fill_polygons)
+      {
+        setData(index, 1., Opacity_role);
+      }
     }
   }
   else
@@ -209,7 +222,11 @@ void Polygon_model::point_in_polygon(double x, double y)
     {
       _label_division_info->setText("");
       QModelIndex index = this->index(_polygon_ids.at(current_mouseover_division).at(0));
-      setData(index, 0.5, Opacity_role);
+      
+      if (fill_polygons)
+      {
+        setData(index, default_opacity, Opacity_role);
+      }
       
       current_mouseover_division = -1;
     }
@@ -223,9 +240,7 @@ void Polygon_model::exited_map()
 
 bool Polygon_model::setData(const QModelIndex &index, const QVariant &value, int role)
 {
-  if (map_not_ready) { return false; }
-  
-  if (_polygons.length() <= index.row()) { return false; }
+  if (map_not_ready || _polygons.length() <= index.row()) { return false; }
   
   // Only the opacity should be changed by a call to setData()
   if (role == Opacity_role)
@@ -312,11 +327,12 @@ void Polygon_model::finalise_setup()
     divisions_upper.append(_divisions.at(i).toUpper());
   }
   
+  double opacity = fill_polygons ? default_opacity : 0.;
+  
   for (int i = 0; i < _polygons.length(); i++)
   {
-    // *** change colors and value here as well; remove from the setup functions. ***
     _polygons[i].value = 0.;
-    _polygons[i].opacity = 0.5;
+    _polygons[i].opacity = opacity;
     _polygons[i].red = 0.;
     _polygons[i].blue = 0.;
     _polygons[i].green = 0.;
@@ -381,4 +397,12 @@ void Polygon_model::setup_error(QString error)
   m.exec();
   endResetModel();
   map_not_ready = true;
+}
+
+void Polygon_model::received_double_click()
+{
+  if (current_mouseover_division >= 0)
+  {
+    emit double_clicked_division(current_mouseover_division);
+  }
 }
