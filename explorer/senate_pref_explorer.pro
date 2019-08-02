@@ -7,6 +7,7 @@
 QT       += core gui sql quickwidgets qml network positioning
 
 RC_ICONS = pref6.ico
+ICON = pref6.icns
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 

@@ -63,7 +63,7 @@ CREATE TABLE btl (id INTEGER PRIMARY KEY, seat_id INTEGER, booth_id INTEGER, num
 #include "booth_model.h"
 
 #include <QMessageBox>
-
+#include <QDebug>
 
 Widget::Widget(QWidget *parent)
   : QWidget(parent),
@@ -88,6 +88,10 @@ Widget::Widget(QWidget *parent)
   qmlRegisterType<Polygon_model>("Division_boundaries", 1, 0, "Polygon_model");
   qmlRegisterType<Booth_model>("Booths", 1, 0, "Booth_model");
   
+#ifdef Q_OS_MACOS
+  allow_division_sort = true;
+#endif
+
   
   // The key to having the interface resize nicely when the user resizes the window is:
   // Add the QSplitter to a QGridLayout, then make the latter the layout for the 
@@ -318,7 +322,7 @@ Widget::Widget(QWidget *parent)
   table_main->setEditTriggers(QAbstractItemView::NoEditTriggers);
   table_main->setShowGrid(false);
   table_main->setAlternatingRowColors(true);
-  table_main->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+  table_main->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: #000000; }");
   table_main->setFocusPolicy(Qt::NoFocus);
   table_main->setSelectionMode(QAbstractItemView::NoSelection);
   table_main->verticalHeader()->setDefaultAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -397,7 +401,7 @@ Widget::Widget(QWidget *parent)
   table_divisions->setEditTriggers(QAbstractItemView::NoEditTriggers);
   table_divisions->setShowGrid(false);
   table_divisions->setAlternatingRowColors(true);
-  table_divisions->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+  table_divisions->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: #000000; }");
   table_divisions->setFocusPolicy(Qt::NoFocus);
   table_divisions->setSelectionMode(QAbstractItemView::NoSelection);
   
@@ -1546,6 +1550,7 @@ void Widget::sort_main_table_npp()
     {
       std::sort(table_main_data[i].begin(), table_main_data[i].end(),
                 [&](Table_main_item a, Table_main_item b)->bool {
+        if (a.group_id == b.group_id) { return false; }
         if (clicked_n_parties.indexOf(a.group_id) >= 0) { return false; }
         if (clicked_n_parties.indexOf(b.group_id) >= 0) { return true;  }
         
@@ -1561,6 +1566,7 @@ void Widget::sort_main_table_npp()
     {
       std::sort(table_main_data[i].begin(), table_main_data[i].end(),
                 [&](Table_main_item a, Table_main_item b)->bool {
+        if (a.group_id == b.group_id) { return false; }
         if (clicked_n_parties.indexOf(a.group_id) >= 0) { return false; }
         if (clicked_n_parties.indexOf(b.group_id) >= 0) { return true;  }
         
@@ -3610,6 +3616,7 @@ void Widget::sort_main_table()
 
 void Widget::sort_divisions_table_data()
 {
+  if (!allow_division_sort) { return; }
   int i = sort_divisions.i;
   bool desc = sort_divisions.is_descending;
   
@@ -3635,6 +3642,8 @@ void Widget::sort_divisions_table_data()
     {
       std::sort(table_divisions_data.begin(), table_divisions_data.end(),
                 [&](Table_divisions_item a, Table_divisions_item b)->bool {
+        if (a.division == b.division) { return false; }
+
         if (a.votes.at(i - 1) == b.votes.at(i - 1))
         {
           return (a.division < b.division) != desc;
@@ -3646,6 +3655,8 @@ void Widget::sort_divisions_table_data()
     {
       std::sort(table_divisions_data.begin(), table_divisions_data.end(),
                 [&](Table_divisions_item a, Table_divisions_item b)->bool {
+        if (a.division == b.division) { return false; }
+
         if (qAbs(a.percentage.at(i - 1) - b.percentage.at(i - 1)) < 1.e-10)
         {
           return (a.division < b.division) != desc;
@@ -3657,6 +3668,8 @@ void Widget::sort_divisions_table_data()
     {
       std::sort(table_divisions_data.begin(), table_divisions_data.end(),
                 [&](Table_divisions_item a, Table_divisions_item b)->bool {
+        if (a.division == b.division) { return false; }
+
         if (qAbs(a.total_percentage.at(i - 1) - b.total_percentage.at(i - 1)) < 1.e-10)
         {
           return (a.division < b.division) != desc;
@@ -5062,7 +5075,7 @@ QPixmap Widget::get_pixmap_for_map()
   label_reset_map_scale->hide();
   QCoreApplication::sendPostedEvents();
   
-  QPixmap map = screen->grabWindow(this->winId(), x, y, width, height);
+  QPixmap map = screen->grabWindow(0, x+x0, y+y0, width, height);
   
   label_reset_map_scale->show();
   
@@ -5117,9 +5130,7 @@ void Widget::export_booths_table()
   
   
   if (booths_output_file == "") { return; }
-  
-  // *** new routine here ***
-  
+
   QFile out_file(booths_output_file);
   QString value_type = get_value_type();
   
@@ -5229,7 +5240,7 @@ void Widget::show_help()
   help->setWindowTitle("Help");
   
   QLabel *label_help = new QLabel();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 1.2, 2019-07-21."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 1.21, 2019-08-02."
                       "<br><br>Such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
                       "https://pappubahry.com/pseph/senate_pref/</a>.  You'll need to download specially made SQLite files, which hold the preference "
                       "data in the format expected by this program.  You can then open these by clicking on the 'Load preferences' button."

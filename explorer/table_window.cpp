@@ -324,7 +324,7 @@ void Table_window::setup_layout(QWidget *w, QStringList variable_widths, QString
     groups_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     groups_table->setShowGrid(false);
     groups_table->setAlternatingRowColors(true);
-    groups_table->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+    groups_table->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: #000000; }");
     groups_table->setFocusPolicy(Qt::NoFocus);
     groups_table->setSelectionMode(QAbstractItemView::NoSelection);
     groups_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
@@ -583,6 +583,7 @@ void Table_window::sort_by_row(int i)
             [&](int a, int b)->bool {
     if (qAbs(_table_data.at(idx_i).at(a) - _table_data.at(idx_i).at(b)) < 1.e-10)
     {
+      if (a == b) { return false; }
       return (a < b) != _sort_row_desc;
     }
     else
@@ -599,6 +600,8 @@ void Table_window::sort_by_column(int i)
   if (_groups_table) {
     std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
               [&](int a, int b)->bool {
+      if (a == b) { return false; }
+
       if (i == 0) { return (_short_names.at(a).compare(_short_names.at(b)) < 0) != _sort_col_desc; }
       else        { return (_full_names.at(a).compare(_full_names.at(b)) < 0)   != _sort_col_desc; }
     });
@@ -609,6 +612,8 @@ void Table_window::sort_by_column(int i)
     {
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
+        if (a == b) { return false; }
+
         if (qAbs(_base.at(a) - _base.at(b)) < 1.e-10)
         {
           return (a < b) != _sort_col_desc;
@@ -633,6 +638,8 @@ void Table_window::sort_by_column(int i)
       
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
+        if (a == b) { return false; }
+
         if (qAbs(_table_data.at(a).at(idx_i) - _table_data.at(b).at(idx_i)) < 1.e-10)
         {
           return (a < b) != _sort_col_desc;
