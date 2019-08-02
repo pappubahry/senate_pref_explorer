@@ -3616,7 +3616,6 @@ void Widget::sort_main_table()
 
 void Widget::sort_divisions_table_data()
 {
-  if (!allow_division_sort) { return; }
   int i = sort_divisions.i;
   bool desc = sort_divisions.is_descending;
   
