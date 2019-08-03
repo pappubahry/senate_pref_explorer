@@ -88,11 +88,6 @@ Widget::Widget(QWidget *parent)
   qmlRegisterType<Polygon_model>("Division_boundaries", 1, 0, "Polygon_model");
   qmlRegisterType<Booth_model>("Booths", 1, 0, "Booth_model");
   
-#ifdef Q_OS_MACOS
-  allow_division_sort = true;
-#endif
-
-  
   // The key to having the interface resize nicely when the user resizes the window is:
   // Add the QSplitter to a QGridLayout, then make the latter the layout for the 
   // main widget ("this").
