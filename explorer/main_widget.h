@@ -96,7 +96,6 @@ private slots:
   void change_pref_sources_min(int i);
   void change_pref_sources_max(int i);
   void change_map_type();
-  //void change_map_booth_type();
   void change_map_booth_threshold(int i);
   void update_map_scale_minmax();
   void calculate_n_party_preferred();
@@ -173,7 +172,6 @@ private:
   QVector<Table_divisions_item> table_divisions_data;
   QVector<QVector<QVector<long>>> table_main_booth_data;
   QVector<QVector<long>> cross_table_data;
-  QVector<QVector<Table_main_item>> temp_booths_npp_data;
   Polygon_model map_divisions_model;
   Booth_model map_booths_model;
   Map_container *qml_map_container;
@@ -236,7 +234,6 @@ private:
   void make_main_table_row_headers(bool is_blank);
   void do_sql_query_for_table(QString q, bool wide_table = false);
   void set_divisions_table();
-  void set_divisions_map();
   void sort_table_column(int i);
   void sort_main_table();
   void sort_main_table_npp();

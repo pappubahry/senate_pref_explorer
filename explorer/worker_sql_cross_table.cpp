@@ -67,7 +67,7 @@ void Worker_sql_cross_table::do_query()
         
         long long votes = query.value(2).toLongLong();
         
-        table_results[i][j] = votes;
+        table_results[i][j] = static_cast<long>(votes);
       }
     }
     else if (_table_type == "first_n_prefs")

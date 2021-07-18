@@ -92,7 +92,7 @@ void Worker_sql_main_table::do_query()
           
           // If the group has already been clicked on in the table, then set the
           // cell to zero.
-          div_votes = _clicked_cells.indexOf(group_id) >= 0 ? 0 : query.value(i).toLongLong();
+          div_votes = _clicked_cells.indexOf(group_id) >= 0 ? 0 : static_cast<long>(query.value(i).toLongLong());
           column_results[group_id][div_id] = div_votes;
         }
       }
@@ -106,7 +106,7 @@ void Worker_sql_main_table::do_query()
         group_id = query.value(1).toInt();
         if (group_id == 999) { group_id = _num_groups; }  // Exhaust
         
-        div_votes = query.value(2).toLongLong();
+        div_votes = static_cast<long>(query.value(2).toLongLong());
         column_results[group_id][div_id] = div_votes;
       }
     }

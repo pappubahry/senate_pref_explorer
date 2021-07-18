@@ -5,6 +5,7 @@
 #include <QThread>
 #include "worker_setup_polygon.h"
 
+
 Polygon_model::Polygon_model(QObject *parent) : QAbstractListModel(parent)
 {
 }
@@ -283,7 +284,7 @@ QHash<int, QByteArray> Polygon_model::roleNames() const
   return names;
 }
 
-void Polygon_model::setup_list(QString state, int year, QStringList divisions)
+void Polygon_model::setup_list(QString db_file, QString state, int year, QStringList divisions)
 {
   map_not_ready = true;
   
@@ -301,20 +302,20 @@ void Polygon_model::setup_list(QString state, int year, QStringList divisions)
     }
     
     QThread *thread = new QThread;
-    Worker_setup_polygon *worker = new Worker_setup_polygon(state,
+    Worker_setup_polygon *worker = new Worker_setup_polygon(db_file,
+                                                            state,
                                                             year,
                                                             divisions,
                                                             _polygons);
     
     
     worker->moveToThread(thread);
-    
-    connect(thread, SIGNAL(started()),              worker, SLOT(start_setup()));
-    connect(worker, SIGNAL(finished_coordinates()), this,   SLOT(finalise_setup()));
-    connect(worker, SIGNAL(finished_coordinates()), thread, SLOT(quit()));
-    connect(worker, SIGNAL(finished_coordinates()), worker, SLOT(deleteLater()));
-    connect(worker, SIGNAL(error(QString)),         this,   SLOT(setup_error(QString)));
-    connect(thread, SIGNAL(finished()),             thread, SLOT(deleteLater()));
+    connect(thread, &QThread::started,                           worker, &Worker_setup_polygon::start_setup);
+    connect(worker, &Worker_setup_polygon::finished_coordinates, this,   &Polygon_model::finalise_setup);
+    connect(worker, &Worker_setup_polygon::finished_coordinates, thread, &QThread::quit);
+    connect(worker, &Worker_setup_polygon::finished_coordinates, worker, &Worker_setup_polygon::deleteLater);
+    connect(worker, &Worker_setup_polygon::error,                this,   &Polygon_model::setup_error);
+    connect(thread, &QThread::finished,                          thread, &QThread::deleteLater);
     thread->start();
   }
 }

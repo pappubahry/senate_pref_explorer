@@ -43,7 +43,7 @@ public:
   Qt::ItemFlags flags(const QModelIndex& index) const override;
   virtual QHash<int, QByteArray> roleNames() const override;
   
-  void setup_list(QString state, int year, QStringList divisions);
+  void setup_list(QString db_file, QString state, int year, QStringList divisions);
   void set_value(int division, double value);
   void clear_values();
   void set_color_scale_bounds(double min, double max);
@@ -78,20 +78,6 @@ private:
   int _decimals = 1;
   double default_opacity = 0.7;
   bool fill_polygons = true;
-  void setup_act_2016(QStringList divisions);
-  void setup_act_2018(QStringList divisions);
-  void setup_nsw_2016(QStringList divisions);
-  void setup_nt_2008(QStringList divisions);
-  void setup_nt_2017(QStringList divisions);
-  void setup_qld_2010(QStringList divisions);
-  void setup_qld_2018(QStringList divisions);
-  void setup_sa_2011(QStringList divisions);
-  void setup_sa_2018(QStringList divisions);
-  void setup_tas_2009(QStringList divisions);
-  void setup_tas_2017(QStringList divisions);
-  void setup_vic_2011(QStringList divisions);
-  void setup_vic_2018(QStringList divisions);
-  void setup_wa_2016(QStringList divisions);
 };
 
 #endif // POLYGON_MODEL_H

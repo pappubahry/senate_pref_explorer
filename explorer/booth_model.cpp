@@ -105,11 +105,11 @@ void Booth_model::setup_list(QVector<Booth> &booths, int booth_threshold)
   
   
   worker->moveToThread(thread);
-  connect(thread, SIGNAL(started()),        worker, SLOT(start_setup()));
-  connect(worker, SIGNAL(finished_setup()), this,   SLOT(finalise_setup()));
-  connect(worker, SIGNAL(finished_setup()), thread, SLOT(quit()));
-  connect(worker, SIGNAL(finished_setup()), worker, SLOT(deleteLater()));
-  connect(thread, SIGNAL(finished()),       thread, SLOT(deleteLater()));
+  connect(thread, &QThread::started,                   worker, &Worker_setup_booth::start_setup);
+  connect(worker, &Worker_setup_booth::finished_setup, this,   &Booth_model::finalise_setup);
+  connect(worker, &Worker_setup_booth::finished_setup, thread, &QThread::quit);
+  connect(worker, &Worker_setup_booth::finished_setup, worker, &Worker_setup_booth::deleteLater);
+  connect(thread, &QThread::finished,                  thread, &QThread::deleteLater);
   thread->start();
 }
 

@@ -8,7 +8,8 @@ class Worker_setup_polygon : public QObject
 {
   Q_OBJECT
 public:
-  Worker_setup_polygon(QString state,
+  Worker_setup_polygon(QString db_file,
+                       QString state,
                        int year,
                        QStringList divisions,
                        QVector<Polygon_item> &polygons);
@@ -22,6 +23,7 @@ public slots:
   void start_setup();
   
 private:
+  QString _db_file;
   QString _state;
   int _year;
   QStringList _divisions;

@@ -92,7 +92,7 @@ void Worker_sql_npp_table::do_query()
         return;
       }
       
-      votes = query.value(2).toLongLong();
+      votes = static_cast<long>(query.value(2).toLongLong());
       
       if (_clicked_n_parties.indexOf(group_id) > -1)
       {

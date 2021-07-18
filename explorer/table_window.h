@@ -27,9 +27,11 @@ public:
   
 signals:
   
-private slots:
-  void clicked_table(const QModelIndex &index);
+public slots:
   void clicked_header(int i);
+  void clicked_table(const QModelIndex &index);
+  
+private slots:
   void sort_columns_by_row_order();
   void sort_rows_by_column_order();
   void copy_table();
@@ -61,7 +63,7 @@ private:
   void setup_table_data_long(QVector<long> &base, QVector<QVector<long>> &t, QStringList &groups);
   void setup_table_data_double(QVector<double> &base, QVector<QVector<double>> &t, QStringList &groups);
   QString get_max_width_string(QVector<QVector<long>> &t);
-  void setup_layout(QWidget *w, QStringList variable_widths, QString regular_width);
+  void setup_layout(Table_window *w, QStringList variable_widths, QString regular_width);
   void setup_model();
   void setup_model_divisions();
   void set_table_cells();

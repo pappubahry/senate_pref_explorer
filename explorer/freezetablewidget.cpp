@@ -2,6 +2,7 @@
 // is released under the GNU Free Documentation license.
 
 #include "freezetablewidget.h"
+#include "table_window.h"
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QFontMetrics>
@@ -11,7 +12,7 @@ FreezeTableWidget::FreezeTableWidget(QAbstractItemModel *model,
                                      QStringList variable_widths,
                                      QString regular_width,
                                      bool use_bold,
-                                     QWidget *parent)
+                                     Table_window *parent)
 {
   _parent = parent;
   setModel(model);
@@ -23,6 +24,7 @@ FreezeTableWidget::FreezeTableWidget(QAbstractItemModel *model,
   int width_1 = QFontMetrics(font_bold).boundingRect(regular_width).width() + 5;
   
   int width_2 = 10;
+  
   for (int i = 0; i < variable_widths.length(); i++)
   {
     width_2 = qMax(width_2, QFontMetrics(font_bold).boundingRect(variable_widths.at(i)).width());
@@ -79,8 +81,8 @@ void FreezeTableWidget::init()
   
   frozenTableView->horizontalScrollBar()->setEnabled(false);
   
-  connect(frozenTableView->horizontalHeader(), SIGNAL(sectionClicked(int)),          _parent, SLOT(clicked_header(int)));
-  connect(frozenTableView,                     SIGNAL(clicked(const QModelIndex &)), _parent, SLOT(clicked_table(const QModelIndex &)));
+  connect(frozenTableView->horizontalHeader(), &QHeaderView::sectionClicked, _parent, &Table_window::clicked_header);
+  connect(frozenTableView,                     &QTableView::clicked,         _parent, &Table_window::clicked_table);
 }
 
 void FreezeTableWidget::resizeEvent(QResizeEvent * event)

@@ -251,7 +251,7 @@ Table_window::~Table_window()
 }
 
 
-void Table_window::setup_layout(QWidget *w, QStringList variable_widths, QString regular_width)
+void Table_window::setup_layout(Table_window *w, QStringList variable_widths, QString regular_width)
 {
   QVBoxLayout *layout = new QVBoxLayout();
   QHBoxLayout *layout_buttons = new QHBoxLayout();
@@ -277,17 +277,17 @@ void Table_window::setup_layout(QWidget *w, QStringList variable_widths, QString
   {
     ClickableLabel *label_sort_rows_to_column = new ClickableLabel();
     label_sort_rows_to_column->setText("<i>Sort rows to column order</i>");
-    label_sort_rows_to_column->setCursor(Qt::ArrowCursor);
+    label_sort_rows_to_column->setCursor(Qt::PointingHandCursor);
     
     ClickableLabel *label_sort_columns_to_row = new ClickableLabel();
     label_sort_columns_to_row->setText("<i>Sort columns to row order</i>");
-    label_sort_columns_to_row->setCursor(Qt::ArrowCursor);
+    label_sort_columns_to_row->setCursor(Qt::PointingHandCursor);
     
     layout->addWidget(label_sort_rows_to_column);
     layout->addWidget(label_sort_columns_to_row);
     
-    connect(label_sort_columns_to_row, SIGNAL(clicked()), this, SLOT(sort_columns_by_row_order()));
-    connect(label_sort_rows_to_column, SIGNAL(clicked()), this, SLOT(sort_rows_by_column_order()));
+    connect(label_sort_columns_to_row, &ClickableLabel::clicked, this, &Table_window::sort_columns_by_row_order);
+    connect(label_sort_rows_to_column, &ClickableLabel::clicked, this, &Table_window::sort_rows_by_column_order);
   }
   
   _title.replace("  ", " ");
@@ -298,13 +298,14 @@ void Table_window::setup_layout(QWidget *w, QStringList variable_widths, QString
   
   if (_standard_cross_table || _division_cross_table)
   {
+    variable_widths << "Group";
     table = new FreezeTableWidget(_model, variable_widths, regular_width, _division_cross_table, w);
     layout->addWidget(table);
     
     QHeaderView *table_header = table->horizontalHeader();
     
-    connect(table,        SIGNAL(clicked(const QModelIndex &)), this, SLOT(clicked_table(const QModelIndex &)));
-    connect(table_header, SIGNAL(sectionClicked(int)),          this, SLOT(clicked_header(int)));
+    connect(table,        &FreezeTableWidget::clicked,  this, &Table_window::clicked_table);
+    connect(table_header, &QHeaderView::sectionClicked, this, &Table_window::clicked_header);
   }
   else
   {
@@ -324,7 +325,7 @@ void Table_window::setup_layout(QWidget *w, QStringList variable_widths, QString
     groups_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     groups_table->setShowGrid(false);
     groups_table->setAlternatingRowColors(true);
-    groups_table->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: #000000; }");
+    groups_table->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
     groups_table->setFocusPolicy(Qt::NoFocus);
     groups_table->setSelectionMode(QAbstractItemView::NoSelection);
     groups_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
@@ -338,13 +339,13 @@ void Table_window::setup_layout(QWidget *w, QStringList variable_widths, QString
     
     QHeaderView *table_header = groups_table->horizontalHeader();
     
-    connect(table_header, SIGNAL(sectionClicked(int)), this, SLOT(clicked_header(int)));
+    connect(table_header, &QHeaderView::sectionClicked, this, &Table_window::clicked_header);
   }
   
   w->setLayout(layout);
   
-  connect(button_copy,   SIGNAL(clicked()), this, SLOT(copy_table()));
-  connect(button_export, SIGNAL(clicked()), this, SLOT(export_table()));
+  connect(button_copy,   &QPushButton::clicked, this, &Table_window::copy_table);
+  connect(button_export, &QPushButton::clicked, this, &Table_window::export_table);
 }
 
 void Table_window::setup_model()
@@ -581,13 +582,24 @@ void Table_window::sort_by_row(int i)
   
   std::sort(_sort_indices_cols.begin(), _sort_indices_cols.end(),
             [&](int a, int b)->bool {
+    
+    
+    
+    
+    
+    
     if (qAbs(_table_data.at(idx_i).at(a) - _table_data.at(idx_i).at(b)) < 1.e-10)
     {
-      if (a == b) { return false; }
+      
+      
+      
       return (a < b) != _sort_row_desc;
     }
     else
     {
+      
+      
+      
       return (_table_data.at(idx_i).at(a) < _table_data.at(idx_i).at(b)) != _sort_row_desc;
     }
   });
@@ -600,8 +612,6 @@ void Table_window::sort_by_column(int i)
   if (_groups_table) {
     std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
               [&](int a, int b)->bool {
-      if (a == b) { return false; }
-
       if (i == 0) { return (_short_names.at(a).compare(_short_names.at(b)) < 0) != _sort_col_desc; }
       else        { return (_full_names.at(a).compare(_full_names.at(b)) < 0)   != _sort_col_desc; }
     });
@@ -612,14 +622,40 @@ void Table_window::sort_by_column(int i)
     {
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
-        if (a == b) { return false; }
-
+        
+        // *** TEMPORARY TESTING, MUST DELETE ***
+        QFile sort_file("sort_detailss.csv");
+        
+        sort_file.open(QIODevice::WriteOnly | QIODevice::Append);
+        
+        QTextStream out(&sort_file);
+        out << QString("%1,%2,%3,%4")
+               .arg(a)
+               .arg(b)
+               .arg(_base.at(a))
+               .arg(_base.at(b));
+        
+        
+        
+        
+        
+        
+        
         if (qAbs(_base.at(a) - _base.at(b)) < 1.e-10)
         {
+          // *** DELETE ***
+          out << ",Returning a < b" << endl;
+          sort_file.close();
+          
           return (a < b) != _sort_col_desc;
         }
         else
         {
+          // *** DELETE ***
+          out << ",Returning data a < data b" << endl;
+          sort_file.close();
+          
+          
           return (_base.at(a) < _base.at(b)) != _sort_col_desc;
         }
       });
@@ -638,8 +674,6 @@ void Table_window::sort_by_column(int i)
       
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
-        if (a == b) { return false; }
-
         if (qAbs(_table_data.at(a).at(idx_i) - _table_data.at(b).at(idx_i)) < 1.e-10)
         {
           return (a < b) != _sort_col_desc;

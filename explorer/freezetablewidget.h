@@ -7,6 +7,8 @@
 #include <QWidget>
 #include <QTableView>
 
+class Table_window;
+
 class FreezeTableWidget : public QTableView {
   Q_OBJECT
 
@@ -15,14 +17,14 @@ public:
                     QStringList variable_widths,
                     QString regular_width,
                     bool use_bold,
-                    QWidget *parent);
+                    Table_window *parent);
   ~FreezeTableWidget() override;
 
 protected:
   void resizeEvent(QResizeEvent *event) override;
 
 private:
-  QWidget *_parent;
+  Table_window *_parent;
   QTableView *frozenTableView;
   void init();
   void updateFrozenTableGeometry();
