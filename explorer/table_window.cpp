@@ -622,40 +622,12 @@ void Table_window::sort_by_column(int i)
     {
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
-        
-        // *** TEMPORARY TESTING, MUST DELETE ***
-        QFile sort_file("sort_detailss.csv");
-        
-        sort_file.open(QIODevice::WriteOnly | QIODevice::Append);
-        
-        QTextStream out(&sort_file);
-        out << QString("%1,%2,%3,%4")
-               .arg(a)
-               .arg(b)
-               .arg(_base.at(a))
-               .arg(_base.at(b));
-        
-        
-        
-        
-        
-        
-        
         if (qAbs(_base.at(a) - _base.at(b)) < 1.e-10)
         {
-          // *** DELETE ***
-          out << ",Returning a < b" << endl;
-          sort_file.close();
-          
           return (a < b) != _sort_col_desc;
         }
         else
         {
-          // *** DELETE ***
-          out << ",Returning data a < data b" << endl;
-          sort_file.close();
-          
-          
           return (_base.at(a) < _base.at(b)) != _sort_col_desc;
         }
       });
