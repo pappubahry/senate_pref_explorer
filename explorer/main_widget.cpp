@@ -1567,6 +1567,7 @@ void Widget::sort_main_table_npp()
     {
       std::sort(table_main_data[i].begin(), table_main_data[i].end(),
                 [&](Table_main_item a, Table_main_item b)->bool {
+        if (a.group_id == b.group_id) { return false; }
         if (clicked_n_parties.indexOf(a.group_id) >= 0) { return false; }
         if (clicked_n_parties.indexOf(b.group_id) >= 0) { return true;  }
         
@@ -1582,6 +1583,7 @@ void Widget::sort_main_table_npp()
     {
       std::sort(table_main_data[i].begin(), table_main_data[i].end(),
                 [&](Table_main_item a, Table_main_item b)->bool {
+        if (a.group_id == b.group_id) { return false; }
         if (clicked_n_parties.indexOf(a.group_id) >= 0) { return false; }
         if (clicked_n_parties.indexOf(b.group_id) >= 0) { return true;  }
         
@@ -1619,7 +1621,6 @@ void Widget::sort_main_table_npp()
   set_all_main_table_cells();
   for (int i = 0; i <= current_num_groups; i++)
   {
-    //table_main_model->setItem(i, 1, new QStandardItem(table_main_groups_short.at(table_main_data.at(0).at(i).group_id)));
     table_main_model->setItem(i, 1, new QStandardItem(get_short_group(table_main_data.at(0).at(i).group_id)));
     table_main_model->item(i, 1)->setTextAlignment(Qt::AlignCenter);
   }
@@ -1628,7 +1629,10 @@ void Widget::sort_main_table_npp()
   {
     for (int i = 0; i < num_table_rows; i++)
     {
-      table_main_model->setVerticalHeaderItem(i, new QStandardItem(table_main_groups.at(table_main_data.at(0).at(i).group_id)));
+      const int group_id = table_main_data.at(0).at(i).group_id;
+      const QString header_text = (group_id >= current_num_groups) ? "Total" :
+                                                                     table_main_groups.at(table_main_data.at(0).at(i).group_id);
+      table_main_model->setVerticalHeaderItem(i, new QStandardItem(header_text));
     }
   }
   
@@ -3667,6 +3671,7 @@ void Widget::sort_divisions_table_data()
     {
       std::sort(table_divisions_data.begin(), table_divisions_data.end(),
                 [&](Table_divisions_item a, Table_divisions_item b)->bool {
+        if (a.division == b.division) { return false; }
         if (a.votes.at(i - 1) == b.votes.at(i - 1))
         {
           return (a.division < b.division) != desc;
@@ -3678,6 +3683,7 @@ void Widget::sort_divisions_table_data()
     {
       std::sort(table_divisions_data.begin(), table_divisions_data.end(),
                 [&](Table_divisions_item a, Table_divisions_item b)->bool {
+        if (a.division == b.division) { return false; }
         if (qAbs(a.percentage.at(i - 1) - b.percentage.at(i - 1)) < 1.e-10)
         {
           return (a.division < b.division) != desc;
@@ -3689,6 +3695,7 @@ void Widget::sort_divisions_table_data()
     {
       std::sort(table_divisions_data.begin(), table_divisions_data.end(),
                 [&](Table_divisions_item a, Table_divisions_item b)->bool {
+        if (a.division == b.division) { return false; }
         if (qAbs(a.total_percentage.at(i - 1) - b.total_percentage.at(i - 1)) < 1.e-10)
         {
           return (a.division < b.division) != desc;
@@ -5259,7 +5266,7 @@ void Widget::show_help()
   help->setWindowTitle("Help");
   
   QLabel *label_help = new QLabel();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 1.3, 2021-07-18."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 1.31, 2021-07-19."
                       "<br><br>Such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
                       "https://pappubahry.com/pseph/senate_pref/</a>.  You'll need to download specially made SQLite files, which hold the preference "
                       "data in the format expected by this program.  You can then open these by clicking on the 'Load preferences' button."

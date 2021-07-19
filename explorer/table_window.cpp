@@ -431,10 +431,7 @@ void Table_window::setup_model_divisions()
   _sort_row_desc = true;
   _sort_col = 0;
   _sort_col_desc = true;
-  
-  // *** should be unnnecessary: ***
-  //sort_by_column(0);
-  
+
   set_table_cells();
 }
 
@@ -582,24 +579,13 @@ void Table_window::sort_by_row(int i)
   
   std::sort(_sort_indices_cols.begin(), _sort_indices_cols.end(),
             [&](int a, int b)->bool {
-    
-    
-    
-    
-    
-    
+    if (a == b) { return false; }
     if (qAbs(_table_data.at(idx_i).at(a) - _table_data.at(idx_i).at(b)) < 1.e-10)
     {
-      
-      
-      
       return (a < b) != _sort_row_desc;
     }
     else
     {
-      
-      
-      
       return (_table_data.at(idx_i).at(a) < _table_data.at(idx_i).at(b)) != _sort_row_desc;
     }
   });
@@ -612,6 +598,7 @@ void Table_window::sort_by_column(int i)
   if (_groups_table) {
     std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
               [&](int a, int b)->bool {
+      if (a == b) { return false; }
       if (i == 0) { return (_short_names.at(a).compare(_short_names.at(b)) < 0) != _sort_col_desc; }
       else        { return (_full_names.at(a).compare(_full_names.at(b)) < 0)   != _sort_col_desc; }
     });
@@ -622,6 +609,7 @@ void Table_window::sort_by_column(int i)
     {
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
+        if (a == b) { return false; }
         if (qAbs(_base.at(a) - _base.at(b)) < 1.e-10)
         {
           return (a < b) != _sort_col_desc;
@@ -646,6 +634,7 @@ void Table_window::sort_by_column(int i)
       
       std::sort(_sort_indices_rows.begin(), _sort_indices_rows.end(),
                 [&](int a, int b)->bool {
+        if (a == b) { return false; }
         if (qAbs(_table_data.at(a).at(idx_i) - _table_data.at(b).at(idx_i)) < 1.e-10)
         {
           return (a < b) != _sort_col_desc;
