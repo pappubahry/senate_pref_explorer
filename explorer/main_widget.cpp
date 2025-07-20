@@ -336,6 +336,10 @@ Widget::Widget(QWidget* parent)
   layout_custom_total_base_line->setContentsMargins(0, 0, 0, 0);
 
   layout_custom_inputs->setLabelAlignment(Qt::AlignRight);
+  layout_custom_inputs->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+#if defined(Q_OS_MAC)
+  layout_custom_inputs->setVerticalSpacing(4);
+#endif
 
   QFont fixed_width_font  = QFontDatabase::systemFont(QFontDatabase::FixedFont);
   _lineedit_custom_filter = new QLineEdit();
@@ -415,7 +419,7 @@ Widget::Widget(QWidget* parent)
   _table_main->setEditTriggers(QAbstractItemView::NoEditTriggers);
   _table_main->setShowGrid(false);
   _table_main->setAlternatingRowColors(true);
-  _table_main->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+  _table_main->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: black; }");
   _table_main->setFocusPolicy(Qt::NoFocus);
   _table_main->viewport()->setFocusPolicy(Qt::NoFocus);
   _table_main->setSelectionMode(QAbstractItemView::NoSelection);
@@ -501,13 +505,14 @@ Widget::Widget(QWidget* parent)
   _table_divisions->setEditTriggers(QAbstractItemView::NoEditTriggers);
   _table_divisions->setShowGrid(false);
   _table_divisions->setAlternatingRowColors(true);
-  _table_divisions->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+  _table_divisions->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: black; }");
   _table_divisions->setFocusPolicy(Qt::NoFocus);
   _table_divisions->setSelectionMode(QAbstractItemView::NoSelection);
   _table_divisions->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
   _table_divisions->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 
   _table_divisions->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  _table_divisions->horizontalHeader()->setDefaultAlignment(Qt::AlignVCenter);
   _table_divisions->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
   _table_divisions->verticalHeader()->setDefaultSectionSize(_one_line_height);
   _table_divisions->verticalHeader()->hide();
@@ -589,9 +594,11 @@ Widget::Widget(QWidget* parent)
 
   const QString ini_path = QString("%1/map.ini")
                              .arg(QCoreApplication::applicationDirPath());
+  qDebug() << ini_path;
 
   if (!QFile::exists(ini_path))
   {
+    qDebug() << "Making file?";
     QFile ini_file(ini_path);
     if (ini_file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
@@ -1417,7 +1424,7 @@ void Widget::_setup_main_table()
 
   if (table_type == Table_types::NPP)
   {
-    _table_main_model->horizontalHeaderItem(0)->setTextAlignment(Qt::AlignRight);
+    _table_main_model->horizontalHeaderItem(0)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
   }
 }
 
@@ -2752,7 +2759,7 @@ void Widget::_calculate_n_party_preferred()
   // so make it now.
   _table_main_model->setColumnCount(n + 3);
   _table_main_model->setHorizontalHeaderItem(n + 2, new QStandardItem("Exh"));
-  _table_main_model->horizontalHeaderItem(n + 2)->setTextAlignment(Qt::AlignRight);
+  _table_main_model->horizontalHeaderItem(n + 2)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
   QString q = QString("SELECT booth_id, P1, COUNT(id)");
 
@@ -6418,11 +6425,11 @@ void Widget::_set_divisions_table()
   {
     if (i == 0)
     {
-      _table_divisions_model->horizontalHeaderItem(i)->setTextAlignment(Qt::AlignLeft);
+      _table_divisions_model->horizontalHeaderItem(i)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     }
     else
     {
-      _table_divisions_model->horizontalHeaderItem(i)->setTextAlignment(Qt::AlignRight);
+      _table_divisions_model->horizontalHeaderItem(i)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
     }
   }
 
@@ -6674,7 +6681,7 @@ void Widget::_clicked_main_table(const QModelIndex& index)
         const int num_cols = _table_main_model->columnCount();
         _table_main_model->setColumnCount(num_cols + 1);
         _table_main_model->setHorizontalHeaderItem(num_cols, new QStandardItem(_table_main_groups_short.at(clicked_group_id)));
-        _table_main_model->horizontalHeaderItem(num_cols)->setTextAlignment(Qt::AlignRight);
+        _table_main_model->horizontalHeaderItem(num_cols)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
       }
 
       _button_n_party_preferred_calculate->setEnabled(_clicked_n_parties.length() > 0);
@@ -7758,8 +7765,13 @@ void Widget::_show_help()
   help->setWindowTitle("Help");
 
   QLabel* label_help = new QLabel();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-06-**."
-                      "<br><br>Such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
+  const QString custom_doc = QDir(QCoreApplication::applicationDirPath()).filePath("custom_queries.html");
+  const QString custom_href = QUrl::fromLocalFile(custom_doc).toString();
+  qDebug() << custom_href;
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-20."
+                      "<br><br>Documentation for the custom queries is available <a href=\""
+                      + custom_href + "\">here</a>."
+                      "<br><br>Otherwise, such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
                       "https://pappubahry.com/pseph/senate_pref/</a>.  You'll need to download specially made SQLite files, which hold the preference "
                       "data in the format expected by this program.  You can then open these by clicking on the 'Load preferences' button."
                       "<br><br>This software was made with Qt Creator, using Qt 6.9: <a href=\"https://www.qt.io/\">https://www.qt.io/</a>; Qt components"

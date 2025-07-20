@@ -377,7 +377,7 @@ void Table_window::_setup_layout(QStringList& variable_widths, const QString& re
     groups_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     groups_table->setShowGrid(false);
     groups_table->setAlternatingRowColors(true);
-    groups_table->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+    groups_table->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: black; }");
     groups_table->setFocusPolicy(Qt::NoFocus);
     groups_table->setSelectionMode(QAbstractItemView::NoSelection);
     groups_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
@@ -526,11 +526,11 @@ void Table_window::_set_table_cells()
             _model->horizontalHeaderItem(1)->setText("Group");
           }
 
-          _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignCenter);
+          _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
         }
 
         _model->item(i, 1)->setText(_groups.at(idx_i));
-        _model->item(i, 1)->setTextAlignment(Qt::AlignCenter);
+        _model->item(i, 1)->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
       }
       else if (_custom_cross_table)
       {
@@ -541,10 +541,10 @@ void Table_window::_set_table_cells()
           first_header.toInt(&is_number);
           const QString header = is_number ? "Number" : first_header.indexOf("_") >= 0 ? "Cand" : "Group";
           _model->horizontalHeaderItem(1)->setText(header);
-          _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignCenter);
+          _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
         }
         _model->item(i, 1)->setText(_custom_row_headers.at(idx_i));
-        _model->item(i, 1)->setTextAlignment(Qt::AlignCenter);
+        _model->item(i, 1)->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
       }
       else
       {
@@ -552,7 +552,7 @@ void Table_window::_set_table_cells()
         if (i == 0)
         {
           _model->horizontalHeaderItem(1)->setText("Division");
-          _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignLeft);
+          _model->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         }
 
         _model->item(i, 1)->setText(_divisions.at(idx_i));

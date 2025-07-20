@@ -133,7 +133,7 @@ void Freeze_table_widget::_style_table(QTableView* t, int width_1, int width_2)
   t->setEditTriggers(QAbstractItemView::NoEditTriggers);
   t->setShowGrid(false);
   t->setAlternatingRowColors(true);
-  t->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff}");
+  t->setStyleSheet("QTableView {alternate-background-color: #f0f0f0; background-color: #ffffff; color: black;}");
   t->setFocusPolicy(Qt::NoFocus);
   t->setSelectionMode(QAbstractItemView::NoSelection);
   t->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
