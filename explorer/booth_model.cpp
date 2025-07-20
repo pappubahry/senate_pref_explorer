@@ -29,7 +29,6 @@ QVariant Booth_model::data(const QModelIndex &index, int role) const
   else if (role == Green_role)          { return QVariant(item.green);                  }
   else if (role == Blue_role)           { return QVariant(item.blue);                   }
   else if (role == Visible_text_role)   { return QVariant(item.visible_text);           }
-  //else if (role == Visible_square_role) { return QVariant(item.visible_square);         }
   else if (role == Coordinates_role)    { return QVariant::fromValue(item.coordinates); }
   
   return QVariant();
@@ -37,13 +36,13 @@ QVariant Booth_model::data(const QModelIndex &index, int role) const
 
 bool Booth_model::setData(const QModelIndex &index, const QVariant &value, int role)
 {
-  if (map_not_ready || _booths.length() <= index.row()) { return false; }
+  if (_map_not_ready || _booths.length() <= index.row()) { return false; }
   
-  long i = index.row();
+  const int i = index.row();
   
   if (role == Visible_text_role)
   {
-    bool v = value.toBool();
+    const bool v = value.toBool();
     if (_booths.at(i).visible_text != v)
     {
       _booths[i].visible_text = v;
@@ -51,20 +50,7 @@ bool Booth_model::setData(const QModelIndex &index, const QVariant &value, int r
       return true;
     }
   }
-  /*
-  else if (role == Visible_square_role)
-  {
-    bool v = value.toBool();
-    if (_booths.at(i).visible_square != v)
-    {
-      _booths[i].visible_square = v;
-      emit dataChanged(index, index, QVector<int>() << Visible_square_role);
-      return true;
-    }
-  }
-  */
-  
-  
+
   return false;
 }
 
@@ -89,7 +75,7 @@ QHash<int, QByteArray> Booth_model::roleNames() const
 
 void Booth_model::setup_list(QVector<Booth> &booths, int booth_threshold)
 {
-  map_not_ready = true;
+  _map_not_ready = true;
   
   beginResetModel();
   _booths.clear();
@@ -100,8 +86,8 @@ void Booth_model::setup_list(QVector<Booth> &booths, int booth_threshold)
                                                       _booths,
                                                       _booth_ids,
                                                       booth_threshold,
-                                                      text_type,
-                                                      prepoll);
+                                                      _text_type,
+                                                      _prepoll);
   
   
   worker->moveToThread(thread);
@@ -116,12 +102,12 @@ void Booth_model::setup_list(QVector<Booth> &booths, int booth_threshold)
 void Booth_model::finalise_setup()
 {
   endResetModel();
-  map_not_ready = false;
+  _map_not_ready = false;
 }
 
 void Booth_model::clear_values()
 {
-  if (map_not_ready) { return; }
+  if (_map_not_ready) { return; }
   for (int i = 0; i < _booths.length(); i++)
   {
     set_value(_booths.at(i).booth_id, 0.);
@@ -129,12 +115,12 @@ void Booth_model::clear_values()
   set_colors();
 }
 
-void Booth_model::set_value(long booth_id, double value)
+void Booth_model::set_value(int booth_id, double value)
 {
   if (_booth_ids.at(booth_id) < 0) { return; }
-  if (booth_id >= _booth_ids.length() || map_not_ready) { return; }
+  if (booth_id >= _booth_ids.length() || _map_not_ready) { return; }
   
-  long i = _booth_ids.at(booth_id);
+  const int i = _booth_ids.at(booth_id);
   
   _booths[i].value = value;
   _booths[i].text = QString("%1").arg(value, 0, 'f', _decimals);
@@ -144,21 +130,21 @@ void Booth_model::set_value(long booth_id, double value)
 
 void Booth_model::set_colors()
 {
-  if (map_not_ready || idle) { return; }
+  if (_map_not_ready || _idle) { return; }
   
   for (int i = 0; i < _booths.length(); i++)
   {
-    double denom = color_scale_max - color_scale_min;
-    int j = denom > 1e-5 ? qRound(255 * (_booths.at(i).value - color_scale_min) / denom) : 0;
+    const double denom = _color_scale_max - _color_scale_min;
+    int j = denom > 1e-5 ? qRound(255 * (_booths.at(i).value - _color_scale_min) / denom) : 0;
     
     j = qMax(j, 0);
     j = qMin(j, 255);
     
-    _booths[i].red   = viridis_scale.at(j).at(0);
-    _booths[i].green = viridis_scale.at(j).at(1);
-    _booths[i].blue  = viridis_scale.at(j).at(2);
+    _booths[i].red   = _viridis_scale.at(j).at(0);
+    _booths[i].green = _viridis_scale.at(j).at(1);
+    _booths[i].blue  = _viridis_scale.at(j).at(2);
     
-    QModelIndex index = this->index(i);
+    const QModelIndex index = this->index(i);
     emit dataChanged(index, index, QVector<int>() << Red_role << Green_role << Blue_role);
   }
 }
@@ -173,65 +159,52 @@ void Booth_model::set_decimals_mouseover(int n)
   _decimals_mouseover = n;
 }
 
-void Booth_model::set_type(QString type)
+void Booth_model::set_visible(bool b)
 {
-  if (type == "square")
+  _text_type = b;
+  if (!b)
   {
-    //square_type = true;
-    text_type = false;
-  }
-  else if (type == "text")
-  {
-    //square_type = false;
-    text_type = true;
-  }
-  else if (type == "none")
-  {
-    //square_type = false;
-    text_type = false;
-    idle = true;
+    _idle = true;
   }
   
-  for (long i = 0; i < _booths.length(); i++)
+  for (int i = 0; i < _booths.length(); i++)
   {
     recalculate_visible(i);
   }
 }
 
-bool Booth_model::is_booth_visible(long i)
+bool Booth_model::is_booth_visible(int i)
 {
   return _booths.at(i).in_active_division &&
-         _booths.at(i).prepoll == prepoll &&
+         _booths.at(i).prepoll == _prepoll &&
          _booths.at(i).above_threshold;
 }
 
-void Booth_model::recalculate_visible(long i)
+void Booth_model::recalculate_visible(int i)
 {
-  bool v        = is_booth_visible(i);
-  bool v_text   = v && text_type;
-  //bool v_square = v && square_type;
+  const bool v        = is_booth_visible(i);
+  const bool v_text   = v && _text_type;
   
-  QModelIndex index = this->index(i);
-  setData(index, v_text,   Visible_text_role);
-  //setData(index, v_square, Visible_square_role);
+  const QModelIndex index = this->index(i);
+  setData(index, v_text, Visible_text_role);
 }
 
 void Booth_model::update_scale_min(double x)
 {
-  color_scale_min = x;
+  _color_scale_min = x;
   set_colors();
 }
 
 void Booth_model::update_scale_max(double x)
 {
-  color_scale_max = x;
+  _color_scale_max = x;
   set_colors();
 }
 
 void Booth_model::update_min_votes(int n)
 {
   Q_UNUSED(n);
-  for (long i = 0; i < _booths.length(); i++)
+  for (int i = 0; i < _booths.length(); i++)
   {
     _booths[i].above_threshold = _booths.at(i).formal_votes >= n;
     recalculate_visible(i);
@@ -240,7 +213,7 @@ void Booth_model::update_min_votes(int n)
 
 void Booth_model::update_active_division(int division)
 {
-  for (long i = 0; i < _booths.length(); i++)
+  for (int i = 0; i < _booths.length(); i++)
   {
     if (division >= 0)
     {
@@ -262,12 +235,12 @@ void Booth_model::check_mouseover(double lon, double lat, double d_lon, double d
   
   QStringList mouseover_text;
   
-  for (long i = 0; i < _booths.length(); i++)
+  for (int i = 0; i < _booths.length(); i++)
   {
     if (_booths.at(i).visible_text)
     {
-      double dx = (_booths.at(i).coordinates.longitude() - lon) / d_lon;
-      double dy = (_booths.at(i).coordinates.latitude() - lat) / d_lat;
+      const double dx = (_booths.at(i).coordinates.longitude() - lon) / d_lon;
+      const double dy = (_booths.at(i).coordinates.latitude() - lat) / d_lat;
       
       if (dx*dx + dy*dy < r2)
       {
@@ -278,9 +251,8 @@ void Booth_model::check_mouseover(double lon, double lat, double d_lon, double d
         }
         
         mouseover_text.append(QString("%1 %2: %3")
-                              .arg(_booths.at(i).division_name)
-                              .arg(_booths.at(i).booth_name)
-                              .arg(_booths.at(i).value, 0, 'f', _decimals_mouseover));
+                              .arg(_booths.at(i).division_name, _booths.at(i).booth_name,
+                                QString::number(_booths.at(i).value, 'f', _decimals_mouseover)));
       }
     }
   }
@@ -290,10 +262,7 @@ void Booth_model::check_mouseover(double lon, double lat, double d_lon, double d
   
   for (int i = 0; i < mouseover_text.length(); i++)
   {
-    text = QString("%1%2%3")
-        .arg(text)
-        .arg(newline)
-        .arg(mouseover_text.at(i));
+    text = QString("%1%2%3").arg(text, newline, mouseover_text.at(i));
     
     newline = "<br>";
   }
@@ -303,9 +272,9 @@ void Booth_model::check_mouseover(double lon, double lat, double d_lon, double d
 
 void Booth_model::update_prepoll_flag(bool show_prepoll)
 {
-  prepoll = show_prepoll;
+  _prepoll = show_prepoll;
   
-  for (long i = 0; i < _booths.length(); i++)
+  for (int i = 0; i < _booths.length(); i++)
   {
     recalculate_visible(i);
   }
@@ -313,5 +282,5 @@ void Booth_model::update_prepoll_flag(bool show_prepoll)
 
 void Booth_model::set_idle(bool b)
 {
-  idle = b;
+  _idle = b;
 }

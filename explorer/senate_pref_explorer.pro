@@ -30,28 +30,45 @@ CONFIG += c++11
 
 SOURCES += \
         booth_model.cpp \
-        freezetablewidget.cpp \
+        custom_expr.cpp \
+        custom_lexer.cpp \
+        custom_operation.cpp \
+        custom_parser.cpp \
+        freeze_table_widget.cpp \
         main.cpp \
         main_widget.cpp \
         map_container.cpp \
         polygon_model.cpp \
+        table_type_constants.cpp \
         table_window.cpp \
         worker_setup_booth.cpp \
         worker_setup_polygon.cpp \
         worker_sql_cross_table.cpp \
+        worker_sql_custom_every_expr.cpp \
+        worker_sql_custom_table.cpp \
         worker_sql_main_table.cpp \
         worker_sql_npp_table.cpp
 
 HEADERS += \
         booth_model.h \
-        freezetablewidget.h \
+        clickable_label.h \
+        custom_expr.h \
+        custom_lexer.h \
+        custom_operation.h \
+        custom_parser.h \
+        custom_token.h \
+        freeze_table_widget.h \
         main_widget.h \
         map_container.h \
         polygon_model.h \
+        table_type_constants.h \
+        table_view.h \
         table_window.h \
         worker_setup_booth.h \
         worker_setup_polygon.h \
         worker_sql_cross_table.h \
+        worker_sql_custom_every_expr.h \
+        worker_sql_custom_table.h \
         worker_sql_main_table.h \
         worker_sql_npp_table.h
 
