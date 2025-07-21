@@ -235,12 +235,8 @@ void Worker_sql_custom_table::do_query()
     auto& process_vote     = _have_aggregated ? process_vote_with_aggregation : process_vote_without_aggregation;
     auto& axis_table_index = _have_aggregated ? axis_table_index_with_aggregation : axis_table_index_without_aggregation;
 
-    //int vote_ct = 0;
-
     while (query.next())
     {
-      //vote_ct++;
-      //if (vote_ct > 2) { break; }
       // SELECT booth_id, Pfor0, Pfor1, ..., Pfor(N-1), num_prefs, num_prefs, P1, P2, ..., PN FROM atl
       // Stack:           Pfor0, Pfor1, ..., Pfor(N-1), Exh,       num_prefs, P1, P2, ..., PN
       for (int iv = 0; iv < 2 * _num_groups + 2; ++iv)

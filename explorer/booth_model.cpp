@@ -108,14 +108,23 @@ void Booth_model::finalise_setup()
 void Booth_model::clear_values()
 {
   if (_map_not_ready) { return; }
-  for (int i = 0; i < _booths.length(); i++)
+  const int num_booths = _booths.length();
+  for (int i = 0; i < num_booths; i++)
   {
-    set_value(_booths.at(i).booth_id, 0.);
+    set_value(_booths.at(i).booth_id, 0., false);
   }
+
+  if (num_booths > 0)
+  {
+    const QModelIndex top    = index(0, 0);
+    const QModelIndex bottom = index(num_booths - 1, 0);
+    emit dataChanged(top, bottom, { Value_role, Text_role });
+  }
+
   set_colors();
 }
 
-void Booth_model::set_value(int booth_id, double value)
+void Booth_model::set_value(int booth_id, double value, bool emit_signal)
 {
   if (_booth_ids.at(booth_id) < 0) { return; }
   if (booth_id >= _booth_ids.length() || _map_not_ready) { return; }
@@ -124,15 +133,30 @@ void Booth_model::set_value(int booth_id, double value)
   
   _booths[i].value = value;
   _booths[i].text = QString("%1").arg(value, 0, 'f', _decimals);
-  QModelIndex index = this->index(i);
-  emit dataChanged(index, index, QVector<int>() << Value_role << Text_role);
+  if (emit_signal)
+  {
+    QModelIndex index = this->index(i);
+    emit dataChanged(index, index, QVector<int>() << Value_role << Text_role);
+  }
+}
+
+void Booth_model::emit_all_data_changed_text()
+{
+  const int num_booths = _booths.length();
+  if (num_booths > 0)
+  {
+    const QModelIndex top    = index(0, 0);
+    const QModelIndex bottom = index(num_booths - 1, 0);
+    emit dataChanged(top, bottom, { Value_role, Text_role });
+  }
 }
 
 void Booth_model::set_colors()
 {
   if (_map_not_ready || _idle) { return; }
   
-  for (int i = 0; i < _booths.length(); i++)
+  const int num_booths = _booths.length();
+  for (int i = 0; i < num_booths; i++)
   {
     const double denom = _color_scale_max - _color_scale_min;
     int j = denom > 1e-5 ? qRound(255 * (_booths.at(i).value - _color_scale_min) / denom) : 0;
@@ -143,9 +167,13 @@ void Booth_model::set_colors()
     _booths[i].red   = _viridis_scale.at(j).at(0);
     _booths[i].green = _viridis_scale.at(j).at(1);
     _booths[i].blue  = _viridis_scale.at(j).at(2);
-    
-    const QModelIndex index = this->index(i);
-    emit dataChanged(index, index, QVector<int>() << Red_role << Green_role << Blue_role);
+  }
+
+  if (num_booths > 0)
+  {
+    const QModelIndex top    = index(0,   0);
+    const QModelIndex bottom = index(num_booths - 1, 0);
+    emit dataChanged(top, bottom, { Red_role, Green_role, Blue_role });
   }
 }
 

@@ -33,6 +33,7 @@ CREATE TABLE boundaries (id INTEGER PRIARY KEY, boundaries_csv TEXT)
 #include <QScreen>
 #include <QSizePolicy>
 #include <QSplitter>
+#include <QStyleFactory>
 
 // Form elements:
 #include <QComboBox>
@@ -205,25 +206,6 @@ Widget::Widget(QWidget* parent)
   _spinbox_first_n_prefs        = new QSpinBox;
   _spinbox_first_n_prefs->setAlignment(Qt::AlignRight);
   _spinbox_first_n_prefs->setKeyboardTracking(false);
-
-  // Workaround for QTBUG which messes up the arrow buttons on spinboxes, making
-  // them large and arranged horizontally:
-  const int half_spinbox_height = _spinbox_first_n_prefs->sizeHint().height() / 2;
-  const QString spinbox_css     = QString(
-                                "QAbstractSpinBox::up-button {"
-                                    "subcontrol-origin: padding;"
-                                    "subcontrol-position: top right;"
-                                    "width: 16px;"
-                                    "height:%1px;"
-                                    "}"
-                                    "QAbstractSpinBox::down-button {"
-                                    "subcontrol-origin: padding;"
-                                    "subcontrol-position: bottom right;"
-                                    "width: 16px;"
-                                    "height:%1px;"
-                                    "}")
-                                .arg(half_spinbox_height);
-  setStyleSheet(spinbox_css);
 
   const int spinbox_width = _get_width_from_text("999", _spinbox_first_n_prefs);
   _spinbox_first_n_prefs->setMinimumWidth(spinbox_width);
@@ -594,11 +576,9 @@ Widget::Widget(QWidget* parent)
 
   const QString ini_path = QString("%1/map.ini")
                              .arg(QCoreApplication::applicationDirPath());
-  qDebug() << ini_path;
 
   if (!QFile::exists(ini_path))
   {
-    qDebug() << "Making file?";
     QFile ini_file(ini_path);
     if (ini_file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
@@ -838,6 +818,19 @@ Widget::Widget(QWidget* parent)
     }
   }
 
+#if defined(Q_OS_WIN)
+  // Workaround for the hideous spinbox design from Qt 6.8+, in which the
+  // spinbox arrows are enormous and arranged side-by-side:
+  QStyle* vista = QStyleFactory::create("windowsvista");
+  _spinbox_first_n_prefs->setStyle(vista);
+  _spinbox_later_prefs_fixed->setStyle(vista);
+  _spinbox_later_prefs_up_to->setStyle(vista);
+  _spinbox_pref_sources_min->setStyle(vista);
+  _spinbox_pref_sources_max->setStyle(vista);
+  _spinbox_map_booth_threshold->setStyle(vista);
+  _spinbox_map_min->setStyle(vista);
+  _spinbox_map_max->setStyle(vista);
+#endif
   _reset_spinboxes();
 
   container_widget_left->setLayout(layout_left);
@@ -6184,23 +6177,41 @@ void Widget::_fill_in_divisions_table()
   double min_value = 1.1e10;
   double max_value = 0.;
 
+
+  QHeaderView* horizontal_header = _table_divisions->horizontalHeader();
+  horizontal_header->setSectionResizeMode(QHeaderView::Fixed);
+
   for (int i_row = 0; i_row < num_rows; i_row++)
   {
+    QStandardItem* div_item = _table_divisions_model->item(i_row, 0);
+    if (div_item == nullptr)
+    {
+      _table_divisions_model->setItem(i_row, 0, new QStandardItem());
+      div_item = _table_divisions_model->item(i_row, 0);
+    }
+
     if (_table_divisions_data.at(i_row).division == num_rows - 1)
     {
-      _table_divisions_model->setItem(i_row, 0, new QStandardItem(_state_full));
-      _table_divisions_model->item(i_row, 0)->setFont(font_bold);
+      div_item->setText(_state_full);
+      div_item->setFont(font_bold);
       bold_row = true;
     }
     else
     {
-      _table_divisions_model->setItem(i_row, 0, new QStandardItem(_divisions.at(_table_divisions_data.at(i_row).division)));
-      _table_divisions_model->item(i_row, 0)->setFont(font_normal);
+      div_item->setText(_divisions.at(_table_divisions_data.at(i_row).division));
+      div_item->setFont(font_normal);
       bold_row = false;
     }
 
     for (int i_col = 1; i_col < num_cols; i_col++)
     {
+      QStandardItem* item = _table_divisions_model->item(i_row, i_col);
+      if (!item)
+      {
+        _table_divisions_model->setItem(i_row, i_col, new QStandardItem());
+        item = _table_divisions_model->item(i_row, i_col);
+      }
+
       QString cell_text;
       if (value_type == VALUE_VOTES)
       {
@@ -6215,8 +6226,8 @@ void Widget::_fill_in_divisions_table()
         cell_text = QString("%1").arg(_table_divisions_data.at(i_row).total_percentage.at(i_col - 1), 0, 'f', 2);
       }
 
-      _table_divisions_model->setItem(i_row, i_col, new QStandardItem(cell_text));
-      _table_divisions_model->item(i_row, i_col)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+      item->setText(cell_text);
+      item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
       const bool map_npp    = table_type == Table_types::NPP && i_col == _clicked_cells_two_axis.at(0).j;
       const bool map_custom = table_type == Table_types::CUSTOM && _custom_sort_indices_cols.at(i_col - 1) == _clicked_cells_two_axis.at(0).j;
@@ -6232,15 +6243,16 @@ void Widget::_fill_in_divisions_table()
 
       if (bold_row)
       {
-        _table_divisions_model->item(i_row, i_col)->setFont(font_bold);
+        item->setFont(font_bold);
       }
       else
       {
-        _table_divisions_model->item(i_row, i_col)->setFont(font_normal);
+        item->setFont(font_normal);
       }
     }
   }
 
+  horizontal_header->setSectionResizeMode(QHeaderView::ResizeToContents);
   _table_divisions->resizeColumnsToContents();
 
   // Ensure that the spinboxes for min and max of the color
@@ -6368,9 +6380,10 @@ void Widget::_update_map_booths()
       value = _booths.at(j).formal_votes == 0 ? 0. : 100. * votes / _booths.at(j).formal_votes;
     }
 
-    _map_booths_model.set_value(j, value);
+    _map_booths_model.set_value(j, value, false);
   }
 
+  _map_booths_model.emit_all_data_changed_text();
   _map_booths_model.set_colors();
 }
 
@@ -6419,6 +6432,8 @@ void Widget::_set_divisions_table()
     headers.append("Vote");
   }
 
+  QHeaderView* horizontal_header = _table_divisions->horizontalHeader();
+  horizontal_header->setSectionResizeMode(QHeaderView::Fixed);
   _table_divisions_model->setHorizontalHeaderLabels(headers);
 
   for (int i = 0; i < _table_divisions_model->columnCount(); i++)
@@ -6434,6 +6449,9 @@ void Widget::_set_divisions_table()
   }
 
   _fill_in_divisions_table();
+
+  _table_divisions->resizeColumnsToContents();
+  horizontal_header->setSectionResizeMode(QHeaderView::ResizeToContents);
 }
 
 void Widget::_init_main_table_custom(int n_main_rows, int n_rows, int n_main_cols, int n_cols)
@@ -7761,14 +7779,12 @@ void Widget::_show_help()
 {
   QWidget* help = new QWidget(this, Qt::Window);
 
-  //help->setMinimumSize(QSize(400, 500));
   help->setWindowTitle("Help");
 
   QLabel* label_help = new QLabel();
   const QString custom_doc = QDir(QCoreApplication::applicationDirPath()).filePath("custom_queries.html");
   const QString custom_href = QUrl::fromLocalFile(custom_doc).toString();
-  qDebug() << custom_href;
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-20."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-21."
                       "<br><br>Documentation for the custom queries is available <a href=\""
                       + custom_href + "\">here</a>."
                       "<br><br>Otherwise, such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"

@@ -65,7 +65,8 @@ public:
 
   void setup_list(QVector<Booth>& booths, int booth_threshold);
   void clear_values();
-  void set_value(int booth_id, double value);
+  void set_value(int booth_id, double value, bool emit_signal = true);
+  void emit_all_data_changed_text();
   void set_colors();
   void set_decimals(int n);
   void set_decimals_mouseover(int n);
