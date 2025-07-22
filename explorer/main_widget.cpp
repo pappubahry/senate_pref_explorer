@@ -3521,14 +3521,15 @@ void Widget::_slot_calculate_custom()
     };
 
     _lock_main_interface();
-    _label_progress->setText("Calculating <code>all</code>...");
     launch_worker_every_expr(Custom_row_col::ROW, _custom_rows, temp_custom_filter_operations);
     launch_worker_every_expr(Custom_row_col::COL, _custom_cols, temp_custom_filter_operations);
+    _label_progress->setText("Calculating <code>every</code>...");
   }
   catch (const std::exception& ex)
   {
     const QString msg = "Error " + current_step + ".<br><br>" + QString::fromStdString(ex.what());
     _show_error_message(msg);
+    _unlock_main_interface();
   }
 }
 
@@ -7784,7 +7785,7 @@ void Widget::_show_help()
   QLabel* label_help = new QLabel();
   const QString custom_doc = QDir(QCoreApplication::applicationDirPath()).filePath("custom_queries.html");
   const QString custom_href = QUrl::fromLocalFile(custom_doc).toString();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-21."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-22."
                       "<br><br>Documentation for the custom queries is available <a href=\""
                       + custom_href + "\">here</a>."
                       "<br><br>Otherwise, such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
