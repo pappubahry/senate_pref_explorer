@@ -292,6 +292,7 @@ private:
   QStringList _custom_table_col_headers;
   int _num_custom_every_expr_threads;
   int _num_custom_every_expr_threads_completed;
+  QVector<int> _custom_main_table_col_widths;
   QElapsedTimer _timer;
   Polygon_model _map_divisions_model;
   Booth_model _map_booths_model;

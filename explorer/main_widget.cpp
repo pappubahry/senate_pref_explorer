@@ -1411,8 +1411,13 @@ void Widget::_setup_main_table()
   if (table_type != Table_types::CUSTOM)
   {
     _make_main_table_row_headers(doing_atl || !_show_btl_headers);
+    _table_main->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
   }
-  _table_main->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  else
+  {
+    _table_main->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+  }
+
   _table_main->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
 
   if (table_type == Table_types::NPP)
@@ -2045,6 +2050,7 @@ void Widget::_sort_main_table_cols_custom(int clicked_row)
       return (a_votes < b_votes) != _sort_custom_cols.is_descending;
     };
 
+    // First col is the base, which never moves, so add 1 to begin():
     std::sort(_custom_sort_indices_cols.begin() + 1, _custom_sort_indices_cols.end(), comparator);
   }
 
@@ -2194,6 +2200,9 @@ void Widget::_set_all_main_table_cells_custom()
     col_headers.append(_table_main_model->horizontalHeaderItem(1)->text());
   }
 
+  QVector<int> sortable_col_widths(num_data_cols - 1);
+  const bool have_col_widths = (_custom_main_table_col_widths.length() == num_data_cols - 1);
+
   for (int i_data_col = 0; i_data_col < num_data_cols; ++i_data_col)
   {
     const int i_col      = get_table_col(i_data_col);
@@ -2205,8 +2214,12 @@ void Widget::_set_all_main_table_cells_custom()
       // Data  cols go: Base, sortable data
       // _custom_table_col_headers contains only the headers for the sortable
       // data, so subtract one for the Base which is not included.
-      //_table_main_model->horizontalHeaderItem(i_col)->setText(_custom_table_col_headers.at(i_col_read - 1));
       col_headers.append(_custom_table_col_headers.at(i_col_read - 1));
+
+      if (have_col_widths)
+      {
+        sortable_col_widths[i_col - 2 + rows_is_none_offset] = _custom_main_table_col_widths.at(i_col_read - 1);
+      }
     }
 
     for (int i_row = 0; i_row < num_rows; ++i_row)
@@ -2256,10 +2269,40 @@ void Widget::_set_all_main_table_cells_custom()
 
   QHeaderView* horizontal_header = _table_main->horizontalHeader();
   horizontal_header->setSectionResizeMode(QHeaderView::Fixed);
-
   _table_main_model->setHorizontalHeaderLabels(col_headers);
-  _table_main->resizeColumnsToContents();
-  horizontal_header->setSectionResizeMode(QHeaderView::ResizeToContents);
+
+  if (_custom_main_table_col_widths.length() != num_data_cols - 1 || _custom_cols.type == Custom_axis_type::NONE)
+  {
+    _table_main->resizeColumnsToContents();
+    _custom_main_table_col_widths.clear();
+    _custom_main_table_col_widths.resize(num_data_cols - 1);
+
+    for (int i = 1; i < num_data_cols; ++i)
+    {
+      _custom_main_table_col_widths[_custom_sort_indices_cols.at(i) - 1] = horizontal_header->sectionSize(1 - rows_is_none_offset + i);
+    }
+  }
+  else
+  {
+    const int i_col_start = 2 - rows_is_none_offset;
+    for (int i = 0; i < num_data_cols - 1; ++i)
+    {
+      _table_main->setColumnWidth(i + i_col_start, sortable_col_widths.at(i));
+    }
+  }
+
+  const int num_cols = _table_main_model->columnCount();
+  for (int i = 0; i < num_cols; ++i)
+  {
+    if (i == row_header_col)
+    {
+      _table_main_model->horizontalHeaderItem(i)->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
+    }
+    else
+    {
+      _table_main_model->horizontalHeaderItem(i)->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    }
+  }
 
   _set_main_table_row_height();
   // I hadn't intended for the following lines to be necessary, but if you
@@ -3382,6 +3425,7 @@ void Widget::_slot_calculate_custom()
   _custom_axis_numbers.clear();
   _custom_row_stack_indices.clear();
   _custom_col_stack_indices.clear();
+  _custom_main_table_col_widths.clear();
   _num_custom_every_expr_threads           = 0;
   _num_custom_every_expr_threads_completed = 0;
   _clear_divisions_table();
@@ -5469,6 +5513,16 @@ void Widget::_change_table_type(int i)
 
   _clear_divisions_table();
   _reset_table();
+
+  if (table_type == Table_types::CUSTOM)
+  {
+    _table_main->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+  }
+  else
+  {
+    _table_main->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  }
+
   if (_opened_database)
   {
     _add_column_to_main_table();
@@ -5478,6 +5532,7 @@ void Widget::_change_table_type(int i)
 void Widget::_change_value_type(int i)
 {
   Q_UNUSED(i);
+  _custom_main_table_col_widths.clear();
   _set_all_main_table_cells();
 
   if (_get_value_type() == VALUE_VOTES)
@@ -6565,14 +6620,8 @@ void Widget::_init_main_table_custom(int n_main_rows, int n_rows, int n_main_col
     col_headers.append(_custom_table_col_headers.at(i));
   }
 
-  // Switch off auto-resize while the column headers are added,
-  // otherwise it can take several seconds to update.
-  QHeaderView* horizontal_header = _table_main->horizontalHeader();
-  horizontal_header->setSectionResizeMode(QHeaderView::Fixed);
-
   _table_main_model->setHorizontalHeaderLabels(col_headers);
   _table_main->resizeColumnsToContents();
-  horizontal_header->setSectionResizeMode(QHeaderView::ResizeToContents);
 
   _custom_sort_indices_rows.clear();
   _custom_sort_indices_cols.clear();
