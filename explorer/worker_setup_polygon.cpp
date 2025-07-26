@@ -9,7 +9,8 @@
 #include <QSqlRecord>
 #include <QTextStream>
 
-Worker_setup_polygon::Worker_setup_polygon(QString& db_file, QString& state, int year, QStringList& divisions, QVector<Polygon_item>& polygons)
+Worker_setup_polygon::Worker_setup_polygon(
+  QString& db_file, QString& state, int year, QStringList& divisions, QVector<Polygon_item*>& polygons)
   : _db_file(db_file)
   , _state(state)
   , _year(year)
@@ -27,6 +28,9 @@ void Worker_setup_polygon::start_setup()
   QFile polygons_file;
   bool boundaries_in_db         = false;
   const QString connection_name = "db_conn_polygons";
+
+  QList<QList<QGeoCoordinate>> coords;
+  QStringList names;
 
   if (!_db_file.isEmpty())
   {
@@ -64,7 +68,7 @@ void Worker_setup_polygon::start_setup()
       else
       {
         emit error("Error in database: Missing boundaries.");
-        emit finished_coordinates();
+        emit finished_coordinates(names, coords);
         return;
       }
     }
@@ -82,7 +86,7 @@ void Worker_setup_polygon::start_setup()
     // to work.
     if (_year > 2019)
     {
-      emit finished_coordinates();
+      emit finished_coordinates(names, coords);
       return;
     }
 
@@ -130,7 +134,7 @@ void Worker_setup_polygon::start_setup()
     }
     else
     {
-      emit finished_coordinates();
+      emit finished_coordinates(names, coords);
       return;
     }
 
@@ -149,13 +153,12 @@ void Worker_setup_polygon::start_setup()
     }
     else
     {
-      emit finished_coordinates();
+      emit finished_coordinates(names, coords);
       return;
     }
   }
 
-  Polygon_item item;
-
+  int polygon_count = 0;
   while (!in.atEnd())
   {
     const QString line      = in.readLine();
@@ -163,19 +166,19 @@ void Worker_setup_polygon::start_setup()
 
     if (cells.at(0) == "start")
     {
-      item.division_name = cells.at(1);
-      item.division_id   = _divisions.indexOf(item.division_name);
-      item.coordinates.clear();
+      const QString name = cells.at(1);
+      names.append(name);
+      coords.append(QList<QGeoCoordinate>());
     }
     else if (cells.at(0) == "end")
     {
-      _polygons.append(item);
+      polygon_count++;
     }
     else
     {
-      item.coordinates.append(QGeoCoordinate(cells.at(0).toDouble(), cells.at(1).toDouble()));
+      coords[polygon_count].append(QGeoCoordinate(cells.at(0).toDouble(), cells.at(1).toDouble()));
     }
   }
 
-  emit finished_coordinates();
+  emit finished_coordinates(names, coords);
 }

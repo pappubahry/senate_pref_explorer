@@ -41,7 +41,7 @@ SOURCES += \
         polygon_model.cpp \
         table_type_constants.cpp \
         table_window.cpp \
-        worker_setup_booth.cpp \
+        viridis.cpp \
         worker_setup_polygon.cpp \
         worker_sql_cross_table.cpp \
         worker_sql_custom_every_expr.cpp \
@@ -64,7 +64,7 @@ HEADERS += \
         table_type_constants.h \
         table_view.h \
         table_window.h \
-        worker_setup_booth.h \
+        viridis.h \
         worker_setup_polygon.h \
         worker_sql_cross_table.h \
         worker_sql_custom_every_expr.h \

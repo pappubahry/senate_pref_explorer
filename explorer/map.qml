@@ -113,36 +113,36 @@ Item
 
     MapItemView
     {
-      model: divisionsModel;
+      model: divisionsModel.polygons;
 
       delegate: MapPolygon
       {
-        path: model.coordinates;
+        path: modelData.path;
         border.color: "black";
         border.width: 2;
-        color: Qt.rgba(model.red, model.green, model.blue, model.opacity);
+        color: modelData.color;
       }
     }
 
     MapItemView
     {
-      model: boothsModel
+      model: boothsModel.booths
 
       delegate: MapQuickItem
       {
-        coordinate: model.coordinates;
+        coordinate: modelData.coordinates;
         anchorPoint.x: booth_txt.width/2;
         anchorPoint.y: booth_txt.height/2;
 
         sourceItem: Text
         {
           id: booth_txt;
-          text: model.text;
-          visible: model.text_visible;
+          text: modelData.text;
+          visible: modelData.visible;
           font.pointSize: 14;
           style: Text.Outline;
           styleColor: "black";
-          color: Qt.rgba(model.red, model.green, model.blue, 1.);
+          color: modelData.color;
         }
       }
     }

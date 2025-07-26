@@ -111,7 +111,7 @@ Widget::Widget(QWidget* parent)
   qRegisterMetaType<QVector<QVector<int>>>("QVector<QVector<int>>");
 
   // Required to allow the QML to talk to the model containing the polygons:
-  qmlRegisterType<Polygon_model>("Division_boundaries", 1, 0, "Polygon_model");
+  qmlRegisterType<Polygon_model>("Division_boundaries", 1, 0, "PolygonManager");
   qmlRegisterType<Booth_model>("Booths", 1, 0, "Booth_model");
 
   // The key to having the interface resize nicely when the user resizes the window is:
@@ -6436,10 +6436,9 @@ void Widget::_update_map_booths()
       value = _booths.at(j).formal_votes == 0 ? 0. : 100. * votes / _booths.at(j).formal_votes;
     }
 
-    _map_booths_model.set_value(j, value, false);
+    _map_booths_model.set_value(j, value);
   }
 
-  _map_booths_model.emit_all_data_changed_text();
   _map_booths_model.set_colors();
 }
 
@@ -7834,7 +7833,7 @@ void Widget::_show_help()
   QLabel* label_help = new QLabel();
   const QString custom_doc = QDir(QCoreApplication::applicationDirPath()).filePath("custom_queries.html");
   const QString custom_href = QUrl::fromLocalFile(custom_doc).toString();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-22."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-26."
                       "<br><br>Documentation for the custom queries is available <a href=\""
                       + custom_href + "\">here</a>."
                       "<br><br>Otherwise, such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"

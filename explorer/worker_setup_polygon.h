@@ -8,11 +8,11 @@ class Worker_setup_polygon : public QObject
 {
   Q_OBJECT
 public:
-  Worker_setup_polygon(QString& db_file, QString& state, int year, QStringList& divisions, QVector<Polygon_item>& polygons);
+  Worker_setup_polygon(QString& db_file, QString& state, int year, QStringList& divisions, QVector<Polygon_item*>& polygons);
   ~Worker_setup_polygon();
 
 signals:
-  void finished_coordinates();
+  void finished_coordinates(const QStringList&, const QList<QList<QGeoCoordinate>>&);
   void error(QString err);
 
 public slots:
@@ -23,7 +23,7 @@ private:
   QString _state;
   int _year;
   QStringList _divisions;
-  QVector<Polygon_item>& _polygons;
+  QVector<Polygon_item*>& _polygons;
 };
 
 #endif // WORKER_SETUP_POLYGON_H
