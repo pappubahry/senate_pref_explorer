@@ -30,6 +30,7 @@ void Worker_sql_cross_table::do_query()
     _db.open();
 
     QSqlQuery query(_db);
+    query.setForwardOnly(true);
 
     QVector<QVector<int>> table_results;
 

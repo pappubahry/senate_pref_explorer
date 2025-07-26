@@ -75,6 +75,18 @@ CREATE TABLE boundaries (id INTEGER PRIARY KEY, boundaries_csv TEXT)
 
 #include <QMessageBox>
 
+// For getting available memory:
+#include <cstdint>
+
+#ifdef Q_OS_WIN
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+#elif defined(Q_OS_MAC)
+  #include <mach/mach.h>
+  #include <sys/types.h>
+  #include <sys/sysctl.h>
+#endif
+
 #define rad2deg 57.2957795131
 
 const QString Widget::TABLE_POPUP = "popup";
@@ -1652,45 +1664,47 @@ void Widget::_do_sql_query_for_table(const QString& q, bool wide_table)
 
 QStringList Widget::_queries_threaded(const QString& q, int& num_threads, bool one_thread)
 {
+  return _queries_threaded_with_max(q, num_threads, one_thread ? 1 : -1);
+}
+
+QStringList Widget::_queries_threaded_with_max(const QString &q, int &num_threads, int max_threads)
+{
   const QString abtl   = get_abtl();
   const int max_record = (abtl == "atl" ? _total_atl_votes : _total_btl_votes) - 1;
 
   num_threads = max_record > 10000 ? QThread::idealThreadCount() : 1;
-
-  if (one_thread)
+  if (max_threads > 1)
   {
-    num_threads = 1;
+    num_threads = qMin(num_threads, max_threads);
   }
 
   QStringList queries;
   if (num_threads == 1)
   {
     queries.append(q);
+    return queries;
   }
-  else
+
+  const bool q_has_where = q.contains("WHERE");
+
+  for (int i = 0; i < num_threads; i++)
   {
-    const bool q_has_where = q.contains("WHERE");
+    const int id_1 = (i == 0) ? 0 : max_record * i / num_threads + 1;
+    const int id_2 = max_record * (i + 1) / num_threads;
 
-    for (int i = 0; i < num_threads; i++)
+    QString where_clause = QString("(id BETWEEN %1 AND %2)").arg(id_1).arg(id_2);
+
+    queries.append(q);
+
+    if (q_has_where)
     {
-      const int id_1 = (i == 0) ? 0 : max_record * i / num_threads + 1;
-      const int id_2 = max_record * (i + 1) / num_threads;
-
-      QString where_clause = QString("(id BETWEEN %1 AND %2)").arg(id_1).arg(id_2);
-
-      queries.append(q);
-
-      if (q_has_where)
-      {
-        queries[i].replace(QString("WHERE"), QString("WHERE %1 AND ").arg(where_clause));
-      }
-      else
-      {
-        queries[i].replace(QString("FROM %1").arg(abtl), QString("FROM %1 WHERE %2 ").arg(abtl, where_clause));
-      }
+      queries[i].replace(QString("WHERE"), QString("WHERE %1 AND ").arg(where_clause));
+    }
+    else
+    {
+      queries[i].replace(QString("FROM %1").arg(abtl), QString("FROM %1 WHERE %2 ").arg(abtl, where_clause));
     }
   }
-
   return queries;
 }
 
@@ -3829,15 +3843,32 @@ void Widget::_calculate_custom_query()
     _lock_main_interface();
     _label_progress->setText("Calculating...");
 
-    QStringList queries   = _queries_threaded(q, num_threads, individual_division);
-    _current_threads      = num_threads;
-    _completed_threads    = 0;
     const int n_main_rows = _custom_row_stack_indices.size();
     const int n_main_cols = _custom_col_stack_indices.size();
     const int n_rows      = qMax(1, n_main_rows);
     const int n_cols      = qMax(1, n_main_cols);
+    const int num_booths  = _booths.length();
 
-    const int num_booths = _booths.length();
+    int max_threads = individual_division ? 1 : QThread::idealThreadCount();
+
+    if (!popup)
+    {
+      const qint64 mem_available = _available_physical_memory();
+      const qint64 bytes_per_table = n_rows * n_cols * num_booths * sizeof(int);
+      // The 8 in the following is a fudge factor to work on my computer;
+      // I don't know where all the memory goes.  Threads end up running
+      // slowly and sequentially.
+      const qint64 ratio = mem_available / (8 * bytes_per_table);
+      if (ratio < max_threads)
+      {
+        max_threads = qMax(1, static_cast<int>(ratio));
+      }
+    }
+
+    QStringList queries = _queries_threaded_with_max(q, num_threads, max_threads);
+    _current_threads    = num_threads;
+    _completed_threads  = 0;
+
 
     if (popup)
     {
@@ -7131,6 +7162,48 @@ QString Widget::_get_export_line(QStandardItemModel* model, int i, const QString
 
     return text;
   }
+}
+
+// o4-mini-high
+uint64_t Widget::_available_physical_memory()
+{
+#ifdef Q_OS_WIN
+  MEMORYSTATUSEX st;
+  st.dwLength = sizeof(st);
+  if (!GlobalMemoryStatusEx(&st))
+  {
+    return 0;
+  }
+  // st.ullAvailPhys is the non‐paged, free physical memory
+  return st.ullAvailPhys;
+
+#elif defined(Q_OS_MAC)
+  // First get the page size
+  mach_port_t hostPort = mach_host_self();
+  vm_size_t pageSize;
+  if (host_page_size(hostPort, &pageSize) != KERN_SUCCESS)
+  {
+    return 0;
+  }
+
+  // Now get vm statistics
+  vm_statistics64_data_t vmStats;
+  mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(hostPort,
+                        HOST_VM_INFO64,
+                        reinterpret_cast<host_info64_t>(&vmStats),
+                        &count) != KERN_SUCCESS)
+  {
+    return 0;
+  }
+
+  // Free pages + inactive pages are “available”
+  uint64_t freeBytes     = uint64_t(vmStats.free_count)     * pageSize;
+  uint64_t inactiveBytes = uint64_t(vmStats.inactive_count) * pageSize;
+  return freeBytes + inactiveBytes;
+#endif
+
+  return 0;
 }
 
 void Widget::_copy_model(QStandardItemModel* model, QString title)

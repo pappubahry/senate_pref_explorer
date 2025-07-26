@@ -182,7 +182,9 @@ private:
   void _show_error_message(const QString& msg);
   QString _get_export_divisions_table_title();
   QString _get_export_line(QStandardItemModel* model, int i, const QString& separator);
+  std::uint64_t _available_physical_memory();
   QStringList _queries_threaded(const QString& q, int& num_threads, bool one_thread = false);
+  QStringList _queries_threaded_with_max(const QString& q, int& num_threads, int max_threads = -1);
   QString _get_table_type();
   QString _get_value_type();
   QString _get_groups_table();

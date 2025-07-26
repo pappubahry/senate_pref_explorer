@@ -33,6 +33,7 @@ void Worker_sql_npp_table::do_query()
     _db.open();
 
     QSqlQuery query(_db);
+    query.setForwardOnly(true);
 
     if (!query.exec(_q))
     {

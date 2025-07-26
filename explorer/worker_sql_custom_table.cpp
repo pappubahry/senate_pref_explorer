@@ -69,6 +69,7 @@ void Worker_sql_custom_table::do_query()
     _db.open();
 
     QSqlQuery query(_db);
+    query.setForwardOnly(true);
 
     if (!query.exec(_q))
     {
@@ -371,6 +372,7 @@ void Worker_sql_custom_table::do_query_by_booth()
     _db.open();
 
     QSqlQuery query(_db);
+    query.setForwardOnly(true);
 
     if (!query.exec(_q))
     {
