@@ -103,9 +103,9 @@ const QString Widget::MAP_ELECTION_DAY_BOOTHS = "booths_election_day";
 const QString Widget::MAP_PREPOLL_BOOTHS      = "booths_prepoll";
 
 #ifdef Q_OS_WIN
-  const int Widget::CELL_TEXT_BUFFER = 5;
+  const int Widget::CELL_TEXT_BUFFER = 6;
 #else
-  const int Widget::CELL_TEXT_BUFFER = 10;
+  const int Widget::CELL_TEXT_BUFFER = 11;
 #endif
 
 using Qt::endl;
@@ -6773,7 +6773,14 @@ void Widget::_init_main_table_custom(int n_main_rows, int n_rows, int n_main_col
   const int base_table_col  = (n_main_cols == 0 && n_main_rows > 0) ? 1 : 0;
   const int rows_title_col  = n_main_cols == 0 ? 0 : 1;
 
-  _custom_main_table_col_sorting_col = n_main_cols > 1 ? rows_title_col : -1;
+  if (_custom_rows.type == Custom_axis_type::NONE)
+  {
+    _custom_main_table_col_sorting_col = -1;
+  }
+  else
+  {
+    _custom_main_table_col_sorting_col = n_main_cols > 1 ? rows_title_col : -1;
+  }
 
   QStringList col_headers;
 
