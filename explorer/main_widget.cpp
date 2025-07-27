@@ -102,7 +102,11 @@ const QString Widget::MAP_DIVISIONS           = "divisions";
 const QString Widget::MAP_ELECTION_DAY_BOOTHS = "booths_election_day";
 const QString Widget::MAP_PREPOLL_BOOTHS      = "booths_prepoll";
 
-const int Widget::CELL_TEXT_BUFFER = 5;
+#ifdef Q_OS_WIN
+  const int Widget::CELL_TEXT_BUFFER = 5;
+#else
+  const int Widget::CELL_TEXT_BUFFER = 10;
+#endif
 
 using Qt::endl;
 
@@ -1264,7 +1268,8 @@ void Widget::_load_database(const QString& db_file)
 
         font.setBold(true);
         QFontMetrics bold_metrics(font);
-        _table_divisions_first_col_width = 10 + qMax(_table_divisions_first_col_width, bold_metrics.boundingRect(_state_full).width());
+        // Fudging the padding needed for both Windows and Mac (on my computers at least):
+        _table_divisions_first_col_width = 5 + CELL_TEXT_BUFFER + qMax(_table_divisions_first_col_width, bold_metrics.boundingRect(_state_full).width());
 
         _division_formal_votes.append(_total_formal_votes);
         _combo_division->blockSignals(false);
