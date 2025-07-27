@@ -1745,7 +1745,7 @@ QStringList Widget::_queries_threaded_with_max(const QString &q, int &num_thread
   const int max_record = (abtl == "atl" ? _total_atl_votes : _total_btl_votes) - 1;
 
   num_threads = max_record > 10000 ? QThread::idealThreadCount() : 1;
-  if (max_threads > 1)
+  if (max_threads > 0)
   {
     num_threads = qMin(num_threads, max_threads);
   }
