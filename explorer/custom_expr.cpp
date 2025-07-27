@@ -424,6 +424,8 @@ QString Custom_expr::to_sql(Widget* w) const
     return "(" + _arguments.at(0)->to_sql(w) + " < " + _arguments.at(1)->to_sql(w) + ")";
   case Custom_op_type::LTE:
     return "(" + _arguments.at(0)->to_sql(w) + " <= " + _arguments.at(1)->to_sql(w) + ")";
+  case Custom_op_type::IN_RANGE:
+    return "(" + _arguments.at(0)->to_sql(w) + " BETWEEN " + QString::number(_int_literals.at(0)) + " AND " + QString::number(_int_literals.at(1));
   case Custom_op_type::NOT:
     return "(NOT " + _arguments.at(0)->to_sql(w) + ")";
   case Custom_op_type::AND:
