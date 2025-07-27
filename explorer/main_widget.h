@@ -69,6 +69,8 @@ public:
   Widget(QWidget* parent = nullptr);
   ~Widget();
 
+  bool eventFilter(QObject* object, QEvent* event) override;
+
   static const QString TABLE_POPUP;
   static const QString TABLE_MAIN;
 
@@ -81,6 +83,8 @@ public:
   static const QString MAP_DIVISIONS;
   static const QString MAP_ELECTION_DAY_BOOTHS;
   static const QString MAP_PREPOLL_BOOTHS;
+
+  static const int CELL_TEXT_BUFFER;
 
   int get_num_groups();
   QString get_abtl();
@@ -209,6 +213,10 @@ private:
   QColor _get_n_party_preferred_color();
   QColor _get_unfocused_text_color();
   QColor _get_focused_text_color();
+  int _get_decimal_digits(int n);
+  int _get_text_width(double v, bool bold);
+  int _get_text_width(int n, bool bold);
+  void _clear_col_widths();
   void _set_default_cell_style(int i, int j);
   void _fade_cell(int i, int j);
   void _highlight_cell(int i, int j);
@@ -272,12 +280,19 @@ private:
   QStandardItemModel* _table_main_model;
   QStandardItemModel* _table_divisions_model;
   QVector<QVector<Table_main_item>> _table_main_data;
+  QVector<int> _table_main_col_max_votes_in_div;
+  QVector<int> _table_main_col_max_votes_in_state;
   Table_main_item _table_main_data_total_base;
+  QVector<int> _text_widths_int_normal;
+  QVector<int> _text_widths_int_bold;
+  QVector<int> _text_widths_double_normal;
+  QVector<int> _text_widths_double_bold;
   QVector<Table_divisions_item> _table_divisions_data;
   QVector<QVector<QVector<int>>> _table_main_booth_data;
   QVector<QVector<int>> _table_main_booth_data_row_bases;
   QVector<int> _table_main_booth_data_total_base;
   QVector<QVector<int>> _cross_table_data;
+  int _table_divisions_first_col_width;
   Custom_axis_definition _custom_rows;
   Custom_axis_definition _custom_cols;
   QString _custom_filter_sql;
@@ -295,6 +310,7 @@ private:
   int _num_custom_every_expr_threads;
   int _num_custom_every_expr_threads_completed;
   QVector<int> _custom_main_table_col_widths;
+  int _custom_main_table_col_sorting_col;
   QElapsedTimer _timer;
   Polygon_model _map_divisions_model;
   Booth_model _map_booths_model;

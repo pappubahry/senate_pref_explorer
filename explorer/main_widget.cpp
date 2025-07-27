@@ -102,6 +102,8 @@ const QString Widget::MAP_DIVISIONS           = "divisions";
 const QString Widget::MAP_ELECTION_DAY_BOOTHS = "booths_election_day";
 const QString Widget::MAP_PREPOLL_BOOTHS      = "booths_prepoll";
 
+const int Widget::CELL_TEXT_BUFFER = 5;
+
 using Qt::endl;
 
 Widget::Widget(QWidget* parent)
@@ -379,6 +381,8 @@ Widget::Widget(QWidget* parent)
   _container_custom_widgets->setLayout(layout_custom);
   layout_left->addWidget(_container_custom_widgets);
 
+  _custom_main_table_col_sorting_col = -1;
+
   // ~~~~ End widgets unique to a table type ~~~~
 
   QHBoxLayout* layout_label_toggles = new QHBoxLayout();
@@ -420,6 +424,38 @@ Widget::Widget(QWidget* parent)
   _table_main->verticalHeader()->setDefaultAlignment(Qt::AlignRight | Qt::AlignVCenter);
   _table_main->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
   _table_main->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  _table_main->viewport()->installEventFilter(this);
+  _table_main->viewport()->setMouseTracking(true);
+
+  auto calculate_cell_widths = [](QFont font, QVector<int>& widths, bool is_decimal)
+  {
+    QFontMetrics font_metrics(font);
+    widths.clear();
+    if (is_decimal)
+    {
+      widths.append(font_metrics.horizontalAdvance("9.99"));
+      widths.append(font_metrics.horizontalAdvance("99.99"));
+      widths.append(font_metrics.horizontalAdvance("100.00"));
+    }
+    else
+    {
+      widths.append(font_metrics.horizontalAdvance("9"));
+      widths.append(font_metrics.horizontalAdvance("99"));
+      widths.append(font_metrics.horizontalAdvance("999"));
+      widths.append(font_metrics.horizontalAdvance("9999"));
+      widths.append(font_metrics.horizontalAdvance("99999"));
+      widths.append(font_metrics.horizontalAdvance("999999"));
+      widths.append(font_metrics.horizontalAdvance("9999999"));
+      widths.append(font_metrics.horizontalAdvance("99999999")); // Future-proofing against population growth
+    }
+  };
+
+  QFont font = _table_main->font();
+  calculate_cell_widths(font, _text_widths_int_normal, false);
+  calculate_cell_widths(font, _text_widths_double_normal, true);
+  font.setBold(true);
+  calculate_cell_widths(font, _text_widths_int_bold, false);
+  calculate_cell_widths(font, _text_widths_double_bold, true);
 
   QHeaderView* table_main_header = _table_main->horizontalHeader();
   _reset_npp_sort();
@@ -505,16 +541,14 @@ Widget::Widget(QWidget* parent)
   _table_divisions->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
   _table_divisions->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 
-  _table_divisions->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  _table_divisions->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
   _table_divisions->horizontalHeader()->setDefaultAlignment(Qt::AlignVCenter);
   _table_divisions->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
   _table_divisions->verticalHeader()->setDefaultSectionSize(_one_line_height);
   _table_divisions->verticalHeader()->hide();
 
   QHeaderView* table_divisions_header = _table_divisions->horizontalHeader();
-
-  // *** this doesn't work??? ***
-  table_divisions_header->setCursor(Qt::PointingHandCursor);
+  table_divisions_header->viewport()->setCursor(Qt::PointingHandCursor);
 
   QHBoxLayout* layout_division_buttons = new QHBoxLayout();
   _button_divisions_copy               = new QPushButton("Copy");
@@ -640,6 +674,7 @@ Widget::Widget(QWidget* parent)
 
   _qml_map_container = new Map_container(this);
   _qml_map_container->setStyleSheet("QToolTip { color: #000000; }");
+  _qml_map_container->setClearColor(QColor(255, 0, 0));
 
   _qml_map_container->rootContext()->setContextProperty("useDefaultServer", map_use_default);
   _qml_map_container->rootContext()->setContextProperty("tileServer", map_tile_server);
@@ -923,6 +958,25 @@ Widget::~Widget()
   }
 }
 
+bool Widget::eventFilter(QObject *object, QEvent *event)
+{
+  if (object == _table_main->viewport() && event->type() == QEvent::MouseMove)
+  {
+    QMouseEvent* mouse_event = static_cast<QMouseEvent*>(event);
+    QModelIndex idx = _table_main->indexAt(mouse_event->pos());
+    if (idx.isValid() && idx.column() == _custom_main_table_col_sorting_col)
+    {
+      _table_main->viewport()->setCursor(Qt::PointingHandCursor);
+    }
+    else
+    {
+      _table_main->viewport()->setCursor(Qt::ArrowCursor);
+    }
+  }
+
+  return QWidget::eventFilter(object, event);
+}
+
 int Widget::_get_width_from_text(const QString& t, QWidget* w, int buffer)
 {
   const QSize text_size = w->fontMetrics().size(Qt::TextShowMnemonic, t);
@@ -1005,6 +1059,8 @@ void Widget::_load_database(const QString& db_file)
   _cand_from_short.clear();
   _group_from_candidate.clear();
   _candidates_per_group.clear();
+  _custom_main_table_col_sorting_col = -1;
+  _clear_col_widths();
   _reset_spinboxes();
 
   bool errors = false;
@@ -1188,6 +1244,11 @@ void Widget::_load_database(const QString& db_file)
         bbox.min_longitude = 180.;
         bbox.max_longitude = 0.;
 
+        QFont font = _table_divisions->font();
+        QFontMetrics font_metrics(font);
+        static const int min_width_division_header = font_metrics.boundingRect("Division").width();
+        _table_divisions_first_col_width = min_width_division_header;
+
         while (query.next())
         {
           QString div(query.value(0).toString());
@@ -1195,9 +1256,15 @@ void Widget::_load_database(const QString& db_file)
           _combo_division->addItem(div);
           _division_formal_votes.append(query.value(1).toInt());
           _division_bboxes.append(bbox);
+
+          _table_divisions_first_col_width = qMax(_table_divisions_first_col_width, font_metrics.boundingRect(div).width());
         }
         _combo_division->addItem(_state_full);
         _combo_division->setCurrentIndex(_divisions.length());
+
+        font.setBold(true);
+        QFontMetrics bold_metrics(font);
+        _table_divisions_first_col_width = 10 + qMax(_table_divisions_first_col_width, bold_metrics.boundingRect(_state_full).width());
 
         _division_formal_votes.append(_total_formal_votes);
         _combo_division->blockSignals(false);
@@ -2287,7 +2354,34 @@ void Widget::_set_all_main_table_cells_custom()
 
   if (_custom_main_table_col_widths.length() != num_data_cols - 1 || _custom_cols.type == Custom_axis_type::NONE)
   {
-    _table_main->resizeColumnsToContents();
+    if (row_header_col >= 0)
+    {
+      _table_main->resizeColumnToContents(row_header_col);
+    }
+
+    if (value_type == VALUE_VOTES)
+    {
+      const QVector<int>& max_votes = current_div == _divisions.length() ? _table_main_col_max_votes_in_state : _table_main_col_max_votes_in_div;
+      for (int i = 0; i < num_data_cols; ++i)
+      {
+        const int table_col = i == 0 ? get_table_col(0) : 1 - rows_is_none_offset + i;
+        const int data_col = _custom_sort_indices_cols.at(i);
+        const int header_width = horizontal_header->sectionSizeHint(table_col);
+        const int numeric_width = _get_text_width(max_votes.at(data_col), false);
+        horizontal_header->resizeSection(table_col, qMax(numeric_width, header_width));
+      }
+    }
+    else
+    {
+      const int numeric_width = _get_text_width(100., false);
+      for (int i = 0; i < num_data_cols; ++i)
+      {
+        const int table_col = i == 0 ? get_table_col(0) : 1 - rows_is_none_offset + i;
+        const int header_width = horizontal_header->sectionSizeHint(table_col);
+        horizontal_header->resizeSection(table_col, qMax(numeric_width, header_width));
+      }
+    }
+
     _custom_main_table_col_widths.clear();
     _custom_main_table_col_widths.resize(num_data_cols - 1);
 
@@ -2794,7 +2888,7 @@ void Widget::_calculate_n_party_preferred()
       for (int k = 0; k <= _divisions.length(); k++)
       {
         _table_main_data[i + 1][j].votes.append(0);
-        _table_main_data[i + 1][j].percentages.append(0);
+        _table_main_data[i + 1][j].percentages.append(0.);
       }
 
       _table_main_booth_data[i + 1].append(QVector<int>());
@@ -3442,6 +3536,7 @@ void Widget::_slot_calculate_custom()
   _custom_main_table_col_widths.clear();
   _num_custom_every_expr_threads           = 0;
   _num_custom_every_expr_threads_completed = 0;
+  _clear_col_widths();
   _clear_divisions_table();
   _reset_table();
 
@@ -5110,59 +5205,76 @@ void Widget::_process_thread_sql_custom_main_table(
 
   _completed_threads++;
 
-  if (_completed_threads == _current_threads)
+  if (_completed_threads < _current_threads)
   {
-    // Sum each division's votes to get the division totals.
-    // First column is the row bases, so the number of columns in
-    // _table_main_data will be num_cols + 1.
-    // (The number of columns in the table view will be one higher still,
-    // thanks to the axis labels, i.e. group abbreviations or numbers.)
-
-    const int num_divisions = _divisions.length();
-
-    for (int i_booth = 0; i_booth < num_booths; ++i_booth)
-    {
-      const int booth_total_base_votes = _table_main_booth_data_total_base.at(i_booth);
-      const int division               = _booths.at(i_booth).division_id;
-      _table_main_data_total_base.votes[division] += booth_total_base_votes;
-      _table_main_data_total_base.votes[num_divisions] += booth_total_base_votes;
-
-      for (int i_row = 0; i_row < num_rows; ++i_row)
-      {
-        const int booth_row_base_votes = _table_main_booth_data_row_bases.at(i_row).at(i_booth);
-        _table_main_data[0][i_row].votes[division] += booth_row_base_votes;
-        _table_main_data[0][i_row].votes[num_divisions] += booth_row_base_votes;
-
-        for (int i_col = 0; i_col < num_cols; ++i_col)
-        {
-          const int booth_votes = _table_main_booth_data.at(i_col).at(i_row).at(i_booth);
-          _table_main_data[i_col + 1][i_row].votes[division] += booth_votes;
-          _table_main_data[i_col + 1][i_row].votes[num_divisions] += booth_votes;
-        }
-      }
-    }
-
-    // Calculate percentages for sorting
-    for (int i_col = 0; i_col <= num_cols; ++i_col)
-    {
-      for (int i_row = 0; i_row < num_rows; ++i_row)
-      {
-        for (int i_div = 0; i_div <= num_divisions; i_div++)
-        {
-          const int denominator   = i_col == 0 ? _table_main_data_total_base.votes.at(i_div) : _table_main_data.at(0).at(i_row).votes.at(i_div);
-          const int numerator     = _table_main_data.at(i_col).at(i_row).votes.at(i_div);
-          const double percentage = 100. * numerator / static_cast<double>(qMax(1, denominator));
-
-          _table_main_data[i_col][i_row].percentages[i_div] = percentage;
-        }
-      }
-    }
-
-    _set_all_main_table_cells_custom();
-
-    _show_calculation_time();
-    _unlock_main_interface();
+    return;
   }
+
+  _table_main_col_max_votes_in_div.clear();
+  _table_main_col_max_votes_in_state.clear();
+
+  // Sum each division's votes to get the division totals.
+  // First column is the row bases, so the number of columns in
+  // _table_main_data will be num_cols + 1.
+  // (The number of columns in the table view will be one higher still,
+  // thanks to the axis labels, i.e. group abbreviations or numbers.)
+
+  const int num_divisions = _divisions.length();
+
+  for (int i_booth = 0; i_booth < num_booths; ++i_booth)
+  {
+    const int booth_total_base_votes = _table_main_booth_data_total_base.at(i_booth);
+    const int division               = _booths.at(i_booth).division_id;
+    _table_main_data_total_base.votes[division] += booth_total_base_votes;
+    _table_main_data_total_base.votes[num_divisions] += booth_total_base_votes;
+
+    for (int i_row = 0; i_row < num_rows; ++i_row)
+    {
+      const int booth_row_base_votes = _table_main_booth_data_row_bases.at(i_row).at(i_booth);
+      _table_main_data[0][i_row].votes[division] += booth_row_base_votes;
+      _table_main_data[0][i_row].votes[num_divisions] += booth_row_base_votes;
+
+      for (int i_col = 0; i_col < num_cols; ++i_col)
+      {
+        const int booth_votes = _table_main_booth_data.at(i_col).at(i_row).at(i_booth);
+        _table_main_data[i_col + 1][i_row].votes[division] += booth_votes;
+        _table_main_data[i_col + 1][i_row].votes[num_divisions] += booth_votes;
+      }
+    }
+  }
+
+  // Calculate percentages for sorting
+  for (int i_col = 0; i_col <= num_cols; ++i_col)
+  {
+    _table_main_col_max_votes_in_div.append(0);
+    _table_main_col_max_votes_in_state.append(0);
+
+    for (int i_row = 0; i_row < num_rows; ++i_row)
+    {
+      for (int i_div = 0; i_div <= num_divisions; ++i_div)
+      {
+        const int denominator   = i_col == 0 ? _table_main_data_total_base.votes.at(i_div) : _table_main_data.at(0).at(i_row).votes.at(i_div);
+        const int numerator     = _table_main_data.at(i_col).at(i_row).votes.at(i_div);
+        const double percentage = 100. * numerator / static_cast<double>(qMax(1, denominator));
+
+        _table_main_data[i_col][i_row].percentages[i_div] = percentage;
+
+        if (i_div < num_divisions)
+        {
+          _table_main_col_max_votes_in_div[i_col] = qMax(_table_main_col_max_votes_in_div.at(i_col), numerator);
+        }
+        else
+        {
+          _table_main_col_max_votes_in_state[i_col] = qMax(_table_main_col_max_votes_in_state.at(i_col), numerator);
+        }
+      }
+    }
+  }
+
+  _set_all_main_table_cells_custom();
+
+  _show_calculation_time();
+  _unlock_main_interface();
 }
 
 void Widget::_process_thread_sql_custom_popup_table(int total_base, const QVector<int>& bases, const QVector<QVector<int>>& table)
@@ -5457,6 +5569,7 @@ void Widget::_reset_table()
   _clicked_n_parties.clear();
   _clicked_cells_two_axis.clear();
   _label_custom_filtered_base->setText("");
+  _clear_col_widths();
 
   if (_opened_database)
   {
@@ -5541,6 +5654,17 @@ void Widget::_change_table_type(int i)
   }
   _label_sort->setVisible(show_toggle_sort);
   _label_toggle_names->setVisible(show_toggle_names);
+
+  if (table_type == Table_types::NPP || table_type == Table_types::CUSTOM)
+  {
+    _table_main->horizontalHeader()->viewport()->setCursor(Qt::PointingHandCursor);
+  }
+  else
+  {
+    _table_main->horizontalHeader()->viewport()->setCursor(Qt::ArrowCursor);
+  }
+
+  _custom_main_table_col_sorting_col = -1;
 
   _clear_divisions_table();
   _reset_table();
@@ -6267,6 +6391,7 @@ void Widget::_fill_in_divisions_table()
 
   QHeaderView* horizontal_header = _table_divisions->horizontalHeader();
   horizontal_header->setSectionResizeMode(QHeaderView::Fixed);
+  QVector<int> max_votes_per_col(num_cols - 1);
 
   for (int i_row = 0; i_row < num_rows; i_row++)
   {
@@ -6299,10 +6424,13 @@ void Widget::_fill_in_divisions_table()
         item = _table_divisions_model->item(i_row, i_col);
       }
 
+      const int votes = _table_divisions_data.at(i_row).votes.at(i_col - 1);
+      max_votes_per_col[i_col - 1] = qMax(votes, max_votes_per_col[i_col - 1]);
+
       QString cell_text;
       if (value_type == VALUE_VOTES)
       {
-        cell_text = QString("%1").arg(_table_divisions_data.at(i_row).votes.at(i_col - 1));
+        cell_text = QString("%1").arg(votes);
       }
       if (value_type == VALUE_PERCENTAGES)
       {
@@ -6339,8 +6467,43 @@ void Widget::_fill_in_divisions_table()
     }
   }
 
-  horizontal_header->setSectionResizeMode(QHeaderView::ResizeToContents);
-  _table_divisions->resizeColumnsToContents();
+  _table_divisions->setColumnWidth(0, _table_divisions_first_col_width);
+
+  if (table_type != Table_types::NPP && table_type != Table_types::CUSTOM)
+  {
+    // Only one numeric column; allow it to be wider than necessary.
+    _table_divisions->setColumnWidth(1, _get_text_width(99999999, true));
+  }
+  else if (value_type == VALUE_VOTES)
+  {
+    for (int i_col = 1; i_col < num_cols; ++i_col)
+    {
+      const int numeric_width = _get_text_width(max_votes_per_col.at(i_col - 1), true);
+      const int header_width = _table_divisions->horizontalHeader()->sectionSizeHint(i_col);
+      _table_divisions->setColumnWidth(i_col, qMax(numeric_width, header_width));
+    }
+  }
+  else if (table_type == Table_types::NPP)
+  {
+    const int numeric_width = _get_text_width(100., true);
+    _table_divisions->setColumnWidth(1, numeric_width);
+
+    for (int i_col = 2; i_col < num_cols; ++i_col)
+    {
+      const int main_table_col_width = _table_main->columnWidth(i_col);
+      _table_divisions->setColumnWidth(i_col, qMax(numeric_width, main_table_col_width));
+    }
+  }
+  else if (table_type == Table_types::CUSTOM)
+  {
+    const int numeric_width = _get_text_width(100., true);
+
+    for (int i_col = 1; i_col < num_cols; ++i_col)
+    {
+      const int header_width = _table_divisions->horizontalHeader()->sectionSizeHint(i_col);
+      _table_divisions->setColumnWidth(i_col, qMax(numeric_width, header_width));
+    }
+  }
 
   // Ensure that the spinboxes for min and max of the color
   // scale are different:
@@ -6535,9 +6698,6 @@ void Widget::_set_divisions_table()
   }
 
   _fill_in_divisions_table();
-
-  _table_divisions->resizeColumnsToContents();
-  horizontal_header->setSectionResizeMode(QHeaderView::ResizeToContents);
 }
 
 void Widget::_init_main_table_custom(int n_main_rows, int n_rows, int n_main_cols, int n_cols)
@@ -6608,6 +6768,8 @@ void Widget::_init_main_table_custom(int n_main_rows, int n_rows, int n_main_col
   const int base_table_col  = (n_main_cols == 0 && n_main_rows > 0) ? 1 : 0;
   const int rows_title_col  = n_main_cols == 0 ? 0 : 1;
 
+  _custom_main_table_col_sorting_col = n_main_cols > 1 ? rows_title_col : -1;
+
   QStringList col_headers;
 
   QString rows_title;
@@ -6651,7 +6813,11 @@ void Widget::_init_main_table_custom(int n_main_rows, int n_rows, int n_main_col
   }
 
   _table_main_model->setHorizontalHeaderLabels(col_headers);
-  _table_main->resizeColumnsToContents();
+  for (int i = 0; i < _table_main_model->columnCount(); ++i)
+  {
+    const int w = _table_main->horizontalHeader()->sectionSizeHint(i);
+    _table_main->horizontalHeader()->resizeSection(i, w);
+  }
 
   _custom_sort_indices_rows.clear();
   _custom_sort_indices_cols.clear();
@@ -7906,7 +8072,7 @@ void Widget::_show_help()
   QLabel* label_help = new QLabel();
   const QString custom_doc = QDir(QCoreApplication::applicationDirPath()).filePath("custom_queries.html");
   const QString custom_href = QUrl::fromLocalFile(custom_doc).toString();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-26."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-27."
                       "<br><br>Documentation for the custom queries is available <a href=\""
                       + custom_href + "\">here</a>."
                       "<br><br>Otherwise, such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"
@@ -8044,4 +8210,40 @@ QColor Widget::_get_unfocused_text_color()
 QColor Widget::_get_focused_text_color()
 {
   return QColor(0, 0, 0, 255);
+}
+
+int Widget::_get_decimal_digits(int n)
+{
+  if (n == 0)
+  {
+    return 1;
+  }
+
+  uint32_t u = static_cast<uint32_t>(n);
+  static constexpr uint32_t pow10[] = { 1u, 10u, 100u, 1000u, 10000u, 100000u, 1000000u, 10000000u, 100000000u };
+  const int bit_length = 32 - __builtin_clz(u);
+  const int t = (bit_length * 1233) >> 12;
+  return t - (u < pow10[t]) + 1;
+}
+
+int Widget::_get_text_width(double v, bool bold)
+{
+  v = qMax(1., v);
+  const int v_rounded = qRound(100. * v);
+  const int digits_index = _get_decimal_digits(v_rounded) - 3;
+  return CELL_TEXT_BUFFER + (bold ? _text_widths_double_bold.at(digits_index) : _text_widths_double_normal.at(digits_index));
+}
+
+int Widget::_get_text_width(int n, bool bold)
+{
+  const int digits_index = _get_decimal_digits(n) - 1;
+  // "2 +" fudge factor.
+  return 2 + CELL_TEXT_BUFFER + (bold ? _text_widths_int_bold.at(digits_index) : _text_widths_int_normal.at(digits_index));
+}
+
+void Widget::_clear_col_widths()
+{
+  // Probably not needed.
+  _table_main_col_max_votes_in_div.clear();
+  _table_main_col_max_votes_in_state.clear();
 }

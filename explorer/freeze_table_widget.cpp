@@ -98,6 +98,10 @@ void Freeze_table_widget::_init()
   divider->setMidLineWidth(0);
   divider->setStyleSheet("color: #E0E0E0;");
 
+  _frozen_table_view->viewport()->setCursor(Qt::PointingHandCursor);
+  _frozen_table_view->horizontalHeader()->viewport()->setCursor(Qt::PointingHandCursor);
+  horizontalHeader()->viewport()->setCursor(Qt::PointingHandCursor);
+
   auto update_divider = [=]()
   {
     // world‐coordinate x of the seam:
