@@ -7094,12 +7094,14 @@ void Widget::_clicked_main_table(const QModelIndex& index)
     {
       _table_divisions_data.append(Table_divisions_item());
       _table_divisions_data[i_div].division  = i_div;
-      const int total_percentage_denominator = _division_formal_votes.at(i_div);
-      const int percentage_denominator       = qMax(1, _table_main_data.at(0).at(clicked_i).votes.at(i_div));
+      const int total_percentage_denominator = qMax(1, _division_formal_votes.at(i_div));
+      const int first_col_votes              = _table_main_data.at(0).at(clicked_i).votes.at(i_div);
+      const int first_col_denominator        = qMax(1, _table_main_data_total_base.votes.at(i_div));
+      const int percentage_denominator       = qMax(1, first_col_votes);
 
-      _table_divisions_data[i_div].votes.append(percentage_denominator);
-      _table_divisions_data[i_div].percentage.append(100. * static_cast<double>(percentage_denominator) / _table_main_data_total_base.votes.at(i_div));
-      _table_divisions_data[i_div].total_percentage.append(100. * static_cast<double>(percentage_denominator) / total_percentage_denominator);
+      _table_divisions_data[i_div].votes.append(first_col_votes);
+      _table_divisions_data[i_div].percentage.append(100. * static_cast<double>(first_col_votes) / first_col_denominator);
+      _table_divisions_data[i_div].total_percentage.append(100. * static_cast<double>(first_col_votes) / total_percentage_denominator);
 
       for (int i_col = 1; i_col < num_data_cols; ++i_col)
       {
@@ -8084,7 +8086,7 @@ void Widget::_show_help()
   QLabel* label_help = new QLabel();
   const QString custom_doc = QDir(QCoreApplication::applicationDirPath()).filePath("custom_queries.html");
   const QString custom_href = QUrl::fromLocalFile(custom_doc).toString();
-  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2, 2025-07-27."
+  label_help->setText("Senate preference explorer, written by David Barry, 2019.<br>Version 2.01, 2025-08-02."
                       "<br><br>Documentation for the custom queries is available <a href=\""
                       + custom_href + "\">here</a>."
                       "<br><br>Otherwise, such documentation as there is, as well as links to source code, will be at <a href=\"https://pappubahry.com/pseph/senate_pref/\">"

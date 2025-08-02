@@ -10,8 +10,8 @@ bool Custom_expr::check_valid()
     {
       if (_arguments.at(i)->expr_type() != Custom_expr_type::INTEGER)
       {
-        const QString msg = QString("%1 can only work on integers, not booleans.\n\n")
-          .arg(Custom_operations::op_name(_op_type)) + debug_string(0);
+        const QString msg = QString("%1 can only work on integers, not booleans.\n\n<pre>%2</pre>")
+          .arg(Custom_operations::op_name(_op_type), debug_string(0));
         throw std::runtime_error(msg.toStdString());
       }
     }
@@ -24,8 +24,8 @@ bool Custom_expr::check_valid()
     {
       if (_arguments.at(i)->expr_type() != Custom_expr_type::BOOLEAN)
       {
-        const QString msg = QString("%1 can only work on booleans, not integers.\n\n")
-          .arg(Custom_operations::op_name(_op_type)) + debug_string(0);
+        const QString msg = QString("%1 can only work on booleans, not integers.\n\n<pre>%2</pre>")
+          .arg(Custom_operations::op_name(_op_type), debug_string(0));
         throw std::runtime_error(msg.toStdString());
       }
     }
